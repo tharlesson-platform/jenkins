@@ -1,0 +1,161 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent none
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '20'))
+  }
+
+  parameters {
+    string(name: 'NODE_BUILD_IMAGE', defaultValue: 'node:22-bookworm', description: 'Imagem base para build Node.js.')
+    booleanParam(name: 'ENABLE_SONAR', defaultValue: true, description: 'Executar analise SonarQube.')
+    booleanParam(name: 'PUBLISH_PACKAGE', defaultValue: true, description: 'Publicar pacote npm no Nexus.')
+    booleanParam(name: 'ENABLE_IMAGE_BUILD', defaultValue: false, description: 'Compilar imagem de container.')
+    booleanParam(name: 'ENABLE_IMAGE_PUSH', defaultValue: false, description: 'Publicar imagem de container.')
+    booleanParam(name: 'FAIL_ON_TRIVY', defaultValue: true, description: 'Falhar em vulnerabilidades encontradas pelo Trivy.')
+    string(name: 'SONAR_PROJECT_KEY', defaultValue: 'node-service', description: 'Chave do projeto Sonar.')
+    string(name: 'NEXUS_URL', defaultValue: 'http://nexus:8081', description: 'URL base do Nexus.')
+    string(name: 'NEXUS_NPM_REPO', defaultValue: 'npm-hosted', description: 'Repositorio npm no Nexus.')
+    string(name: 'NEXUS_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para publicacao no Nexus.')
+    string(name: 'IMAGE_REGISTRY', defaultValue: 'localhost:8082', description: 'Endereco do registro de container.')
+    string(name: 'IMAGE_REPOSITORY', defaultValue: 'apps/node-service', description: 'Repositorio da imagem.')
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Sobrescrita da tag da imagem.')
+    string(name: 'TRIVY_SEVERITY', defaultValue: 'HIGH,CRITICAL', description: 'Politica de severidade do Trivy.')
+    string(name: 'REGISTRY_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para login no registro.')
+  }
+
+  stages {
+    stage('Coleta do Codigo') {
+      agent { label 'agent-docker' }
+      steps {
+        checkoutSource()
+        sh 'git rev-parse --short=8 HEAD > .git/short_sha'
+        stash name: 'src', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('Build e Testes em Container Base') {
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'src'
+        runInBaseContainer(
+          image: params.NODE_BUILD_IMAGE,
+          command: '''
+            set -e
+            npm ci
+            node -e "const s=require('./package.json').scripts||{}; process.exit(s.lint?0:1)" && npm run lint || echo "Script de lint nao encontrado; ignorando."
+            node -e "const s=require('./package.json').scripts||{}; process.exit(s.test?0:1)" && npm test -- --ci || echo "Script de teste nao encontrado; ignorando."
+            node -e "const s=require('./package.json').scripts||{}; process.exit(s.coverage?0:1)" && npm run coverage || true
+          ''',
+          label: 'Build/Test Node em container base'
+        )
+        publishJUnit(pattern: '**/junit*.xml,**/test-results/*.xml')
+        archiveArtifacts artifacts: 'coverage/**,dist/**', allowEmptyArchive: true
+        stash name: 'node-build', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('SonarQube') {
+      when { expression { return params.ENABLE_SONAR } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'node-build'
+        script {
+          String scannerHome = tool 'SonarScanner-CLI'
+          runSonarScan(
+            enabled: true,
+            serverName: 'sonarqube',
+            command: "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${params.SONAR_PROJECT_KEY} -Dsonar.sources=src -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info",
+            waitForQualityGate: false
+          )
+        }
+      }
+    }
+
+    stage('Empacotar e Publicar') {
+      when { expression { return params.PUBLISH_PACKAGE } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'node-build'
+        withCredentials([usernamePassword(credentialsId: params.NEXUS_CREDENTIALS_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+          runInBaseContainer(
+            image: params.NODE_BUILD_IMAGE,
+            envVars: ['NEXUS_USER', 'NEXUS_PASS'],
+            command: """
+              set -e
+              npm pack
+              npm config set registry ${params.NEXUS_URL}/repository/${params.NEXUS_NPM_REPO}/
+              npm config set //${params.NEXUS_URL.replaceFirst(/^https?:\\/\\//, '')}/repository/${params.NEXUS_NPM_REPO}/:_auth \$(printf "%s:%s" "${'$'}{NEXUS_USER}" "${'$'}{NEXUS_PASS}" | base64 -w 0)
+              npm publish --registry ${params.NEXUS_URL}/repository/${params.NEXUS_NPM_REPO}/
+            """,
+            label: 'Empacotar/Publicar Node em container base'
+          )
+        }
+        archiveArtifacts artifacts: '*.tgz', allowEmptyArchive: true
+      }
+    }
+
+    stage('Construir Imagem de Container') {
+      when { expression { return params.ENABLE_IMAGE_BUILD } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'node-build'
+        script {
+          String shortSha = fileExists('.git/short_sha') ? readFile('.git/short_sha').trim() : "${env.BUILD_NUMBER}"
+          String imageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : shortSha
+          env.BUILD_IMAGE = "${params.IMAGE_REGISTRY}/${params.IMAGE_REPOSITORY}:${imageTag}"
+        }
+        sh '''
+          set -e
+          docker build -t "${BUILD_IMAGE}" .
+          docker image inspect "${BUILD_IMAGE}" >/dev/null
+        '''
+      }
+    }
+
+    stage('Scan de Imagem com Trivy') {
+      when { expression { return params.ENABLE_IMAGE_BUILD } }
+      agent { label 'agent-docker' }
+      steps {
+        runTrivyScan(
+          image: env.BUILD_IMAGE,
+          severity: params.TRIVY_SEVERITY,
+          failOnVuln: params.FAIL_ON_TRIVY,
+          reportFile: 'reports/trivy-node-image.json'
+        )
+      }
+    }
+
+    stage('Publicar Imagem') {
+      when {
+        allOf {
+          expression { return params.ENABLE_IMAGE_BUILD }
+          expression { return params.ENABLE_IMAGE_PUSH }
+        }
+      }
+      agent { label 'agent-docker' }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIALS_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+          sh '''
+            set -e
+            REGISTRY_HOST="$(echo "${BUILD_IMAGE}" | cut -d/ -f1)"
+            echo "${REGISTRY_PASS}" | docker login "${REGISTRY_HOST}" -u "${REGISTRY_USER}" --password-stdin
+            docker push "${BUILD_IMAGE}"
+            docker logout "${REGISTRY_HOST}" || true
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CI Node ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}

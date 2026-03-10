@@ -1,0 +1,67 @@
+jobs:
+  - script: |
+      folder('CI') {
+        description('Pipelines de Integracao Continua')
+      }
+      folder('CI/Java') {
+        description('Pipelines CI para projetos Java')
+      }
+      folder('CI/Python') {
+        description('Pipelines CI para projetos Python')
+      }
+      folder('CI/Node') {
+        description('Pipelines CI para projetos Node.js')
+      }
+      folder('CI/Go') {
+        description('Pipelines CI para projetos Go')
+      }
+      folder('CI/Containers') {
+        description('Pipelines CI para imagens de container')
+      }
+      folder('CD') {
+        description('Pipelines de entrega e implantacao')
+      }
+      folder('CD/Apps') {
+        description('Pipelines de CD por ambiente')
+      }
+      folder('Admin') {
+        description('Jobs administrativos e inicializacao')
+      }
+
+      pipelineJob('Admin/Seed-From-Repo') {
+        description('Inicializacao de pastas e jobs via Job DSL versionado no repositorio.')
+        parameters {
+          stringParam('REPO_URL', '${SEED_DEFAULT_REPO_URL:-https://github.com/example/jenkins-platform.git}', 'Repositorio Git do monorepo Jenkins')
+          stringParam('BRANCH', '${SEED_DEFAULT_BRANCH:-main}', 'Branch de inicializacao')
+        }
+        definition {
+          cps {
+            script('''pipeline {
+              agent any
+              options { timestamps() }
+              stages {
+                stage('Coleta do Codigo') {
+                  steps {
+                    checkout([$class: 'GitSCM',
+                      branches: [[name: "*/${params.BRANCH}"]],
+                      userRemoteConfigs: [[url: params.REPO_URL]]
+                    ])
+                  }
+                }
+                stage('Executar Seed') {
+                  steps {
+                    jobDsl targets: 'jenkins/seed-jobs/jobdsl/*.groovy',
+                           removedJobAction: 'DISABLE',
+                           removedViewAction: 'DELETE',
+                           failOnMissingPlugin: true
+                  }
+                }
+              }
+            }'''.stripIndent())
+            sandbox()
+          }
+        }
+      }
+
+
+

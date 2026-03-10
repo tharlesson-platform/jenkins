@@ -1,0 +1,302 @@
+name: ${COMPOSE_PROJECT_NAME:-jenkins-platform}
+
+x-default-env: &default-env
+  TZ: ${TZ:-America/Sao_Paulo}
+
+x-agent-env: &agent-env
+  <<: *default-env
+  JENKINS_URL: ${JENKINS_INTERNAL_URL:-http://jenkins-controller:8080}
+  JENKINS_WEB_SOCKET: "true"
+  JENKINS_AGENT_WORKDIR: /home/jenkins/agent
+  JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER:-admin}
+  JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-change_me_now}
+  AGENT_MAX_WAIT_SECONDS: ${AGENT_MAX_WAIT_SECONDS:-300}
+
+x-agent-common: &agent-common
+  restart: unless-stopped
+  depends_on:
+    jenkins-controller:
+      condition: service_healthy
+  networks:
+    - ci-net
+
+networks:
+  ci-net:
+    name: ${COMPOSE_PROJECT_NAME:-jenkins-platform}-net
+    driver: bridge
+
+volumes:
+  jenkins_home:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:
+  postgres_data:
+  nexus_data:
+  agent_java_workdir:
+  agent_python_workdir:
+  agent_node_workdir:
+  agent_go_workdir:
+  agent_docker_workdir:
+  agent_kubernetes_workdir:
+  trivy_cache:
+
+services:
+  jenkins-controller:
+    build:
+      context: ./jenkins
+      args:
+        JENKINS_VERSION: ${JENKINS_VERSION:-lts-jdk21}
+    image: local/jenkins-controller:${JENKINS_VERSION:-lts-jdk21}
+    container_name: jenkins-controller
+    restart: unless-stopped
+    environment:
+      <<: *default-env
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc/jenkins.yaml,/var/jenkins_home/casc/security.yaml,/var/jenkins_home/casc/tools.yaml,/var/jenkins_home/casc/nodes.yaml,/var/jenkins_home/casc/folders.yaml,/var/jenkins_home/casc/jobs.yaml,/var/jenkins_home/casc/views.yaml
+      JENKINS_URL: ${JENKINS_URL:-http://localhost:8080}
+      JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-change_me_now}
+      JENKINS_EXECUTORS: ${JENKINS_EXECUTORS:-0}
+      CASC_RELOAD_TOKEN: ${CASC_RELOAD_TOKEN:-change_me_reload_token}
+      AD_DOMAIN: ${AD_DOMAIN:-example.local}
+      AD_SERVERS: ${AD_SERVERS:-ad01.example.local:3268}
+      AD_BIND_DN: ${AD_BIND_DN:-CN=svc_jenkins,OU=Service Accounts,DC=example,DC=local}
+      AD_BIND_PASSWORD: ${AD_BIND_PASSWORD:-change_me_bind_password}
+      AD_SITE: ${AD_SITE:-}
+      AD_USER_SEARCH_BASE: ${AD_USER_SEARCH_BASE:-}
+      AD_GROUP_SEARCH_BASE: ${AD_GROUP_SEARCH_BASE:-}
+      AD_USER_SEARCH_FILTER: ${AD_USER_SEARCH_FILTER:-}
+      AD_GROUP_SEARCH_FILTER: ${AD_GROUP_SEARCH_FILTER:-}
+      AD_GROUP_ADMINS: ${AD_GROUP_ADMINS:-jenkins-admins}
+      AD_GROUP_DEVELOPERS: ${AD_GROUP_DEVELOPERS:-jenkins-developers}
+      AD_GROUP_READONLY: ${AD_GROUP_READONLY:-jenkins-readonly}
+      AD_GROUP_RELEASE_MANAGERS: ${AD_GROUP_RELEASE_MANAGERS:-jenkins-release-managers}
+      JAVA_OPTS: ${JENKINS_JAVA_OPTS:--Xms512m -Xmx2048m -Djenkins.install.runSetupWizard=false}
+    ports:
+      - "${JENKINS_HTTP_PORT:-8080}:8080"
+      - "${JENKINS_AGENT_PORT:-50000}:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./jenkins/casc:/var/jenkins_home/casc:ro
+      - ./jenkins/init.groovy.d:/usr/share/jenkins/ref/init.groovy.d:ro
+      - ./jenkins/seed-jobs:/usr/share/jenkins/ref/seed-jobs:ro
+      - ./jenkins/shared-library:/usr/share/jenkins/ref/shared-library:ro
+      - ./scripts:/opt/jenkins/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/login || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
+    networks:
+      - ci-net
+
+  sonarqube-db:
+    image: postgres:16-alpine
+    container_name: sonarqube-db
+    restart: unless-stopped
+    profiles: ["sonar"]
+    environment:
+      <<: *default-env
+      POSTGRES_DB: ${POSTGRES_DB:-sonar}
+      POSTGRES_USER: ${POSTGRES_USER:-sonar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sonar}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sonar} -d ${POSTGRES_DB:-sonar}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ci-net
+
+  sonarqube:
+    image: sonarqube:10-community
+    container_name: sonarqube
+    restart: unless-stopped
+    profiles: ["sonar"]
+    depends_on:
+      sonarqube-db:
+        condition: service_healthy
+    environment:
+      <<: *default-env
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/${POSTGRES_DB:-sonar}
+      SONAR_JDBC_USERNAME: ${SONARQUBE_JDBC_USERNAME:-sonar}
+      SONAR_JDBC_PASSWORD: ${SONARQUBE_JDBC_PASSWORD:-sonar}
+    ports:
+      - "${SONARQUBE_PORT:-9000}:9000"
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9000/api/system/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    networks:
+      - ci-net
+
+  nexus:
+    image: sonatype/nexus3:3.74.0
+    container_name: nexus
+    restart: unless-stopped
+    profiles: ["nexus"]
+    environment:
+      <<: *default-env
+      INSTALL4J_ADD_VM_PARAMS: "-Xms512m -Xmx1536m -XX:MaxDirectMemorySize=1536m"
+      NEXUS_CONTEXT: ${NEXUS_CONTEXT_PATH:-/}
+    ports:
+      - "${NEXUS_PORT:-8081}:8081"
+      - "${NEXUS_DOCKER_PORT:-8082}:8082"
+    volumes:
+      - nexus_data:/nexus-data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/service/rest/v1/status >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+    networks:
+      - ci-net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: jenkins-proxy
+    restart: unless-stopped
+    profiles: ["proxy"]
+    depends_on:
+      - jenkins-controller
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - ci-net
+
+  agent-java:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: agents/java/Dockerfile
+      args:
+        INBOUND_AGENT_TAG: ${INBOUND_AGENT_TAG:-latest-jdk21}
+        GRADLE_VERSION: ${GRADLE_VERSION:-8.10.2}
+    image: local/jenkins-agent-java:${AGENT_IMAGE_TAG:-latest}
+    profiles: ["agents", "agent-java"]
+    environment:
+      <<: *agent-env
+      JENKINS_AGENT_NAME: agent-java
+      JENKINS_AGENT_LABELS: "agent-java java maven gradle"
+      JENKINS_AGENT_SECRET: ${AGENT_JAVA_SECRET:-}
+      JENKINS_SECRET: ${AGENT_JAVA_SECRET:-}
+    volumes:
+      - agent_java_workdir:/home/jenkins/agent
+
+  agent-python:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: agents/python/Dockerfile
+      args:
+        INBOUND_AGENT_TAG: ${INBOUND_AGENT_TAG:-latest-jdk21}
+    image: local/jenkins-agent-python:${AGENT_IMAGE_TAG:-latest}
+    profiles: ["agents", "agent-python"]
+    environment:
+      <<: *agent-env
+      JENKINS_AGENT_NAME: agent-python
+      JENKINS_AGENT_LABELS: "agent-python python pip pytest"
+      JENKINS_AGENT_SECRET: ${AGENT_PYTHON_SECRET:-}
+      JENKINS_SECRET: ${AGENT_PYTHON_SECRET:-}
+    volumes:
+      - agent_python_workdir:/home/jenkins/agent
+
+  agent-node:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: agents/node/Dockerfile
+      args:
+        INBOUND_AGENT_TAG: ${INBOUND_AGENT_TAG:-latest-jdk21}
+        NODE_MAJOR: ${NODE_MAJOR:-22}
+    image: local/jenkins-agent-node:${AGENT_IMAGE_TAG:-latest}
+    profiles: ["agents", "agent-node"]
+    environment:
+      <<: *agent-env
+      JENKINS_AGENT_NAME: agent-node
+      JENKINS_AGENT_LABELS: "agent-node node npm yarn"
+      JENKINS_AGENT_SECRET: ${AGENT_NODE_SECRET:-}
+      JENKINS_SECRET: ${AGENT_NODE_SECRET:-}
+    volumes:
+      - agent_node_workdir:/home/jenkins/agent
+
+  agent-go:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: agents/go/Dockerfile
+      args:
+        INBOUND_AGENT_TAG: ${INBOUND_AGENT_TAG:-latest-jdk21}
+        GO_VERSION: ${GO_VERSION:-1.24.1}
+        GOLANGCI_LINT_VERSION: ${GOLANGCI_LINT_VERSION:-v1.61.0}
+    image: local/jenkins-agent-go:${AGENT_IMAGE_TAG:-latest}
+    profiles: ["agents", "agent-go"]
+    environment:
+      <<: *agent-env
+      JENKINS_AGENT_NAME: agent-go
+      JENKINS_AGENT_LABELS: "agent-go go golang"
+      JENKINS_AGENT_SECRET: ${AGENT_GO_SECRET:-}
+      JENKINS_SECRET: ${AGENT_GO_SECRET:-}
+    volumes:
+      - agent_go_workdir:/home/jenkins/agent
+
+  agent-docker:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: agents/docker/Dockerfile
+      args:
+        INBOUND_AGENT_TAG: ${INBOUND_AGENT_TAG:-latest-jdk21}
+    image: local/jenkins-agent-docker:${AGENT_IMAGE_TAG:-latest}
+    profiles: ["agents", "agent-docker"]
+    environment:
+      <<: *agent-env
+      JENKINS_AGENT_NAME: agent-docker
+      JENKINS_AGENT_LABELS: "agent-docker docker trivy buildx"
+      JENKINS_AGENT_SECRET: ${AGENT_DOCKER_SECRET:-}
+      JENKINS_SECRET: ${AGENT_DOCKER_SECRET:-}
+    volumes:
+      - agent_docker_workdir:/home/jenkins/agent
+      - trivy_cache:/home/jenkins/.cache/trivy
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  agent-kubernetes:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: agents/kubernetes/Dockerfile
+      args:
+        INBOUND_AGENT_TAG: ${INBOUND_AGENT_TAG:-latest-jdk21}
+        KUBECTL_VERSION: ${KUBECTL_VERSION:-v1.31.3}
+        HELM_VERSION: ${HELM_VERSION:-v3.16.3}
+        YQ_VERSION: ${YQ_VERSION:-v4.44.5}
+        INSTALL_AWSCLI: ${INSTALL_AWSCLI:-false}
+    image: local/jenkins-agent-kubernetes:${AGENT_IMAGE_TAG:-latest}
+    profiles: ["agents", "agent-kubernetes"]
+    environment:
+      <<: *agent-env
+      JENKINS_AGENT_NAME: agent-kubernetes
+      JENKINS_AGENT_LABELS: "agent-kubernetes kubectl helm yq"
+      JENKINS_AGENT_SECRET: ${AGENT_KUBERNETES_SECRET:-}
+      JENKINS_SECRET: ${AGENT_KUBERNETES_SECRET:-}
+    volumes:
+      - agent_kubernetes_workdir:/home/jenkins/agent

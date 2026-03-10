@@ -1,0 +1,35 @@
+.env
+.env.local
+.env.*.local
+
+.idea/
+.vscode/
+*.swp
+*.tmp
+*.log
+.DS_Store
+
+# Build and reports
+dist/
+build/
+target/
+coverage/
+reports/
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Node
+node_modules/
+
+# Go
+bin/
+
+# Local backup artifacts
+backups/
+*.tar.gz
+
+# OS artifacts
+Thumbs.db

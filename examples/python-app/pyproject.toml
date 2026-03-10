@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-app"
+version = "1.0.0"
+description = "Minimal Python sample for Jenkins CI validation"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "DevOps Team" }]
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

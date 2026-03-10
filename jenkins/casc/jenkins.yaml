@@ -1,0 +1,42 @@
+jenkins:
+  systemMessage: |
+    Jenkins Controller provisionado via codigo.
+    Compatibilidade conceitual: "master/workers" = "controller/agents".
+  mode: NORMAL
+  numExecutors: ${JENKINS_EXECUTORS:-0}
+  scmCheckoutRetryCount: 2
+  slaveAgentPort: 50000
+  labelString: "controller"
+  remotingSecurity:
+    enabled: true
+  disabledAdministrativeMonitors:
+    - "hudson.diagnosis.ReverseProxySetupMonitor"
+  markupFormatter:
+    plainText: {}
+  projectNamingStrategy:
+    standard:
+      forceExistingJobs: false
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: false
+
+unclassified:
+  location:
+    url: "${JENKINS_URL:-http://localhost:8080/}"
+    adminAddress: "jenkins-admin@example.local"
+  timestamperConfig:
+    allPipelines: true
+  globalLibraries:
+    libraries:
+      - name: "${SHARED_LIBRARY_NAME:-jenkins-shared-lib}"
+        defaultVersion: "${SHARED_LIBRARY_DEFAULT_VERSION:-main}"
+        implicit: false
+        allowVersionOverride: true
+        includeInChangesets: true
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "${SHARED_LIBRARY_REPO_URL:-https://github.com/example/jenkins-platform.git}"
+                credentialsId: "${SHARED_LIBRARY_CREDENTIALS_ID:-}"
+

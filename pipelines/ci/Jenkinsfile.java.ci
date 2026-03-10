@@ -1,0 +1,245 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent none
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '20'))
+  }
+
+  parameters {
+    choice(name: 'BUILD_TOOL', choices: ['maven', 'gradle'], description: 'Ferramenta de compilacao Java.')
+    string(name: 'MAVEN_BUILD_IMAGE', defaultValue: 'maven:3.9.11-eclipse-temurin-21', description: 'Imagem base para compilacao Maven.')
+    string(name: 'GRADLE_BUILD_IMAGE', defaultValue: 'gradle:8.10.2-jdk21', description: 'Imagem base para compilacao Gradle.')
+    booleanParam(name: 'ENABLE_SONAR', defaultValue: true, description: 'Executar analise SonarQube.')
+    booleanParam(name: 'WAIT_QUALITY_GATE', defaultValue: false, description: 'Aguardar Quality Gate do Sonar.')
+    booleanParam(name: 'ENABLE_DEPENDENCY_CHECK', defaultValue: true, description: 'Executar OWASP dependency-check.')
+    booleanParam(name: 'PUBLISH_ARTIFACT', defaultValue: true, description: 'Publicar artefato de compilacao no Nexus.')
+    booleanParam(name: 'ENABLE_IMAGE_BUILD', defaultValue: true, description: 'Compilar imagem de container.')
+    booleanParam(name: 'ENABLE_IMAGE_PUSH', defaultValue: false, description: 'Publicar imagem no registro.')
+    booleanParam(name: 'FAIL_ON_TRIVY', defaultValue: true, description: 'Falhar a compilacao quando Trivy encontrar vulnerabilidades High/Critical.')
+    string(name: 'NEXUS_URL', defaultValue: 'http://nexus:8081', description: 'URL base do Nexus.')
+    string(name: 'NEXUS_MAVEN_REPO', defaultValue: 'maven-releases', description: 'Repositorio Maven no Nexus.')
+    string(name: 'NEXUS_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para publicacao no Nexus.')
+    string(name: 'SONAR_PROJECT_KEY', defaultValue: 'java-service', description: 'Chave do projeto Sonar.')
+    string(name: 'IMAGE_REGISTRY', defaultValue: 'localhost:8082', description: 'Endereco do registro de container.')
+    string(name: 'IMAGE_REPOSITORY', defaultValue: 'apps/java-service', description: 'Repositorio da imagem.')
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Sobrescrita da tag da imagem (vazio = SHA curto).')
+    string(name: 'TRIVY_SEVERITY', defaultValue: 'HIGH,CRITICAL', description: 'Politica de severidade do Trivy.')
+    string(name: 'MAVEN_ARGS', defaultValue: '-DskipTests=false', description: 'Argumentos extras do Maven.')
+    string(name: 'GRADLE_ARGS', defaultValue: '', description: 'Argumentos extras do Gradle.')
+    string(name: 'REGISTRY_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para login no registro.')
+  }
+
+  environment {
+    SHORT_SHA = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(8) : ''}"
+    JAVA_BUILD_IMAGE = ''
+  }
+
+  stages {
+    stage('Coleta do Codigo') {
+      agent { label 'agent-docker' }
+      steps {
+        checkoutSource()
+        sh 'git rev-parse --short=8 HEAD > .git/short_sha'
+        stash name: 'src', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('Compilacao e Testes Unitarios') {
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'src'
+        script {
+          env.JAVA_BUILD_IMAGE = params.BUILD_TOOL == 'maven' ? params.MAVEN_BUILD_IMAGE : params.GRADLE_BUILD_IMAGE
+
+          String buildCmd = params.BUILD_TOOL == 'maven'
+            ? """
+                set -e
+                mvn -B -ntp clean test package ${params.MAVEN_ARGS}
+              """
+            : """
+                set -e
+                gradle clean test build --no-daemon ${params.GRADLE_ARGS}
+              """
+
+          runInBaseContainer(
+            image: env.JAVA_BUILD_IMAGE,
+            command: buildCmd,
+            label: "Compilar em container base (${env.JAVA_BUILD_IMAGE})"
+          )
+        }
+        publishJUnit(pattern: '**/surefire-reports/*.xml,**/test-results/test/*.xml')
+        archiveArtifacts artifacts: 'target/**/*.jar,build/libs/**/*.jar,target/site/jacoco/jacoco.xml,build/reports/jacoco/**/*.xml', allowEmptyArchive: true
+        stash name: 'java-build', includes: 'target/**,build/**,pom.xml,build.gradle*,settings.gradle*,src/**,Dockerfile,.git/short_sha', allowEmpty: true, useDefaultExcludes: false
+      }
+    }
+
+    stage('SonarQube') {
+      when { expression { return params.ENABLE_SONAR } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'java-build'
+        script {
+          String sonarCmd = params.BUILD_TOOL == 'maven'
+            ? "mvn -B -ntp sonar:sonar -Dsonar.projectKey=${params.SONAR_PROJECT_KEY}"
+            : "gradle sonarqube -Dsonar.projectKey=${params.SONAR_PROJECT_KEY}"
+
+          runSonarScan(
+            enabled: true,
+            serverName: 'sonarqube',
+            command: sonarCmd,
+            containerImage: env.JAVA_BUILD_IMAGE,
+            waitForQualityGate: params.WAIT_QUALITY_GATE,
+            failOnQualityGate: true
+          )
+        }
+      }
+    }
+
+    stage('Verificacao de Dependencias') {
+      when { expression { return params.ENABLE_DEPENDENCY_CHECK } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'src'
+        sh '''
+          set -e
+          DC_VERSION="12.1.0"
+          mkdir -p .cache/dependency-check reports
+          if [ ! -x ".cache/dependency-check/dependency-check/bin/dependency-check.sh" ]; then
+            curl -fsSL "https://github.com/dependency-check/DependencyCheck/releases/download/v${DC_VERSION}/dependency-check-${DC_VERSION}-release.zip" -o .cache/dc.zip
+            unzip -q .cache/dc.zip -d .cache/dependency-check
+          fi
+          .cache/dependency-check/dependency-check/bin/dependency-check.sh \
+            --project "${JOB_NAME}" \
+            --scan . \
+            --format XML \
+            --out reports
+        '''
+        script {
+          try {
+            dependencyCheckPublisher pattern: 'reports/dependency-check-report.xml', failedTotalCritical: 1, unstableTotalHigh: 1
+          } catch (ignored) {
+            echo 'step dependencyCheckPublisher indisponivel; apenas relatorio XML arquivado.'
+          }
+        }
+        archiveArtifacts artifacts: 'reports/dependency-check-report.*', allowEmptyArchive: true
+      }
+    }
+
+    stage('Publicar Artefato no Nexus') {
+      when { expression { return params.PUBLISH_ARTIFACT } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'java-build'
+        script {
+          if (params.BUILD_TOOL == 'maven') {
+            withCredentials([usernamePassword(credentialsId: params.NEXUS_CREDENTIALS_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+              runInBaseContainer(
+                image: env.JAVA_BUILD_IMAGE,
+                envVars: ['NEXUS_USER', 'NEXUS_PASS'],
+                command: """
+                  set -e
+                  cat > /tmp/settings.xml <<'EOF'
+                  <settings>
+                    <servers>
+                      <server>
+                        <id>${params.NEXUS_MAVEN_REPO}</id>
+                        <username>${'$'}{NEXUS_USER}</username>
+                        <password>${'$'}{NEXUS_PASS}</password>
+                      </server>
+                    </servers>
+                  </settings>
+                  EOF
+                  mvn -B -ntp -s /tmp/settings.xml -DskipTests deploy \
+                    -DaltDeploymentRepository=${params.NEXUS_MAVEN_REPO}::default::${params.NEXUS_URL}/repository/${params.NEXUS_MAVEN_REPO}/
+                """,
+                label: 'Publicar artefato Maven em container base'
+              )
+            }
+          } else {
+            sh '''
+              set -e
+              ARTIFACT_PATH="$(ls -1 build/libs/*.jar | head -n 1)"
+              [ -n "$ARTIFACT_PATH" ]
+              echo "$ARTIFACT_PATH" > artifact.path
+            '''
+            publishArtifact(
+              type: 'raw',
+              repository: params.NEXUS_MAVEN_REPO,
+              nexusUrl: params.NEXUS_URL,
+              credentialsId: params.NEXUS_CREDENTIALS_ID,
+              file: sh(script: 'cat artifact.path', returnStdout: true).trim(),
+              targetPath: "raw/${env.JOB_NAME}/${env.BUILD_NUMBER}/app.jar"
+            )
+          }
+        }
+      }
+    }
+
+    stage('Construir Imagem de Container') {
+      when { expression { return params.ENABLE_IMAGE_BUILD } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'java-build'
+        script {
+          String shortSha = fileExists('.git/short_sha') ? readFile('.git/short_sha').trim() : "${env.BUILD_NUMBER}"
+          String imageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : shortSha
+          env.BUILD_IMAGE = "${params.IMAGE_REGISTRY}/${params.IMAGE_REPOSITORY}:${imageTag}"
+        }
+        sh '''
+          set -e
+          docker buildx version
+          docker build -t "${BUILD_IMAGE}" .
+          docker image inspect "${BUILD_IMAGE}" >/dev/null
+        '''
+      }
+    }
+
+    stage('Scan de Imagem com Trivy') {
+      when { expression { return params.ENABLE_IMAGE_BUILD } }
+      agent { label 'agent-docker' }
+      steps {
+        script {
+          runTrivyScan(
+            image: env.BUILD_IMAGE,
+            severity: params.TRIVY_SEVERITY,
+            failOnVuln: params.FAIL_ON_TRIVY,
+            reportFile: 'reports/trivy-java-image.json'
+          )
+        }
+      }
+    }
+
+    stage('Publicar Imagem de Container') {
+      when {
+        allOf {
+          expression { return params.ENABLE_IMAGE_BUILD }
+          expression { return params.ENABLE_IMAGE_PUSH }
+        }
+      }
+      agent { label 'agent-docker' }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIALS_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+          sh '''
+            set -e
+            REGISTRY_HOST="$(echo "${BUILD_IMAGE}" | cut -d/ -f1)"
+            echo "${REGISTRY_PASS}" | docker login "${REGISTRY_HOST}" -u "${REGISTRY_USER}" --password-stdin
+            docker push "${BUILD_IMAGE}"
+            docker logout "${REGISTRY_HOST}" || true
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CI Java ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}

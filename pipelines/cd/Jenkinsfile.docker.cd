@@ -1,0 +1,93 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent { label 'agent-docker' }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '40'))
+  }
+
+  parameters {
+    choice(name: 'TARGET_ENV', choices: ['dev', 'stage', 'prod'], description: 'Ambiente alvo.')
+    string(name: 'IMAGE', defaultValue: 'localhost:8082/apps/app:latest', description: 'Imagem de container para implantacao.')
+    string(name: 'DEPLOY_HOST', defaultValue: 'docker-host.local', description: 'Servidor Docker ou VM.')
+    string(name: 'DEPLOY_USER', defaultValue: 'jenkins', description: 'Usuario SSH de implantacao.')
+    string(name: 'DEPLOY_PATH', defaultValue: '/opt/apps/myapp', description: 'Caminho remoto do compose.')
+    string(name: 'COMPOSE_FILE', defaultValue: 'docker-compose.yml', description: 'Nome do arquivo compose remoto.')
+    string(name: 'SSH_CREDENTIALS_ID', defaultValue: 'ssh-deploy', description: 'ID da credencial SSH.')
+    booleanParam(name: 'APPROVAL_REQUIRED', defaultValue: true, description: 'Exigir aprovacao manual antes da implantacao.')
+    string(name: 'ROLLBACK_IMAGE', defaultValue: '', description: 'Imagem para reversao (vazio pula etapa de reversao).')
+  }
+
+  stages {
+    stage('Validar Ref e Parametros') {
+      steps {
+        script {
+          if (params.TARGET_ENV == 'prod') {
+            validateRef(ref: env.BRANCH_NAME ?: env.TAG_NAME ?: '', releaseOnly: true)
+          }
+          if (!params.IMAGE?.trim()) {
+            error('Parametro IMAGE e obrigatorio.')
+          }
+        }
+      }
+    }
+
+    stage('Aprovacao Manual') {
+      when { expression { return params.APPROVAL_REQUIRED } }
+      steps {
+        timeout(time: 30, unit: 'MINUTES') {
+          input message: "Aprovar implantacao Docker/VM em ${params.TARGET_ENV} com imagem ${params.IMAGE}?"
+        }
+      }
+    }
+
+    stage('Implantacao') {
+      steps {
+        sshagent(credentials: [params.SSH_CREDENTIALS_ID]) {
+          sh '''
+            set -e
+            ssh -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" "
+              set -e
+              cd ${DEPLOY_PATH}
+              export APP_IMAGE='${IMAGE}'
+              docker compose -f ${COMPOSE_FILE} pull
+              docker compose -f ${COMPOSE_FILE} up -d
+              docker compose -f ${COMPOSE_FILE} ps
+            "
+          '''
+        }
+      }
+    }
+
+    stage('Reversao') {
+      when { expression { return params.ROLLBACK_IMAGE?.trim() } }
+      steps {
+        sshagent(credentials: [params.SSH_CREDENTIALS_ID]) {
+          sh '''
+            set -e
+            ssh -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" "
+              set -e
+              cd ${DEPLOY_PATH}
+              export APP_IMAGE='${ROLLBACK_IMAGE}'
+              docker compose -f ${COMPOSE_FILE} up -d
+              docker compose -f ${COMPOSE_FILE} ps
+            "
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CD Docker ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}
+
+

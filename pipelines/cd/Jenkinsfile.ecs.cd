@@ -1,0 +1,101 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent { label 'agent-kubernetes' }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '40'))
+  }
+
+  parameters {
+    choice(name: 'TARGET_ENV', choices: ['dev', 'stage', 'prod'], description: 'Ambiente alvo.')
+    string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'Regiao AWS.')
+    string(name: 'ECS_CLUSTER', defaultValue: 'apps-cluster', description: 'Nome do cluster ECS.')
+    string(name: 'ECS_SERVICE', defaultValue: 'apps-service', description: 'Nome do servico ECS.')
+    string(name: 'TASK_CONTAINER_NAME', defaultValue: 'app', description: 'Nome do container na task definition.')
+    string(name: 'IMAGE', defaultValue: '123456789012.dkr.ecr.us-east-1.amazonaws.com/app:latest', description: 'URI da imagem.')
+    string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-deploy', description: 'ID de credencial UsernamePassword (user=access_key, pass=secret_key).')
+    booleanParam(name: 'APPROVAL_REQUIRED', defaultValue: true, description: 'Exigir aprovacao manual antes da implantacao.')
+    string(name: 'ROLLBACK_TASK_DEF_ARN', defaultValue: '', description: 'ARN opcional de task definition para reversao.')
+  }
+
+  environment {
+    AWS_DEFAULT_REGION = "${params.AWS_REGION}"
+  }
+
+  stages {
+    stage('Validar Entradas') {
+      steps {
+        script {
+          if (params.TARGET_ENV == 'prod') {
+            validateRef(ref: env.BRANCH_NAME ?: env.TAG_NAME ?: '', releaseOnly: true)
+          }
+        }
+        sh 'aws --version'
+      }
+    }
+
+    stage('Aprovacao Manual') {
+      when { expression { return params.APPROVAL_REQUIRED } }
+      steps {
+        timeout(time: 30, unit: 'MINUTES') {
+          input message: "Aprovar implantacao ECS em ${params.TARGET_ENV} servico=${params.ECS_SERVICE} imagem=${params.IMAGE}?"
+        }
+      }
+    }
+
+    stage('Implantacao') {
+      when { expression { return !params.ROLLBACK_TASK_DEF_ARN?.trim() } }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''
+            set -e
+            CURRENT_TD_ARN="$(aws ecs describe-services --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}" --query "services[0].taskDefinition" --output text)"
+            aws ecs describe-task-definition --task-definition "${CURRENT_TD_ARN}" --query "taskDefinition" > taskdef-current.json
+            cat taskdef-current.json \
+              | jq --arg IMAGE "${IMAGE}" --arg NAME "${TASK_CONTAINER_NAME}" '
+                  .containerDefinitions = (.containerDefinitions | map(if .name == $NAME then .image = $IMAGE else . end))
+                  | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+                ' > taskdef-new.json
+            NEW_TD_ARN="$(aws ecs register-task-definition --cli-input-json file://taskdef-new.json --query "taskDefinition.taskDefinitionArn" --output text)"
+            aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${ECS_SERVICE}" --task-definition "${NEW_TD_ARN}" --force-new-deployment >/dev/null
+            aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"
+            echo "Task definition implantada: ${NEW_TD_ARN}" | tee deployed-taskdef.txt
+          '''
+        }
+        archiveArtifacts artifacts: 'taskdef-current.json,taskdef-new.json,deployed-taskdef.txt', allowEmptyArchive: true
+      }
+    }
+
+    stage('Reversao') {
+      when { expression { return params.ROLLBACK_TASK_DEF_ARN?.trim() } }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh '''
+            set -e
+            aws ecs update-service \
+              --cluster "${ECS_CLUSTER}" \
+              --service "${ECS_SERVICE}" \
+              --task-definition "${ROLLBACK_TASK_DEF_ARN}" \
+              --force-new-deployment >/dev/null
+            aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"
+            echo "Rollback para: ${ROLLBACK_TASK_DEF_ARN}" | tee rollback-taskdef.txt
+          '''
+        }
+        archiveArtifacts artifacts: 'rollback-taskdef.txt', allowEmptyArchive: true
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CD ECS ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}
+
+

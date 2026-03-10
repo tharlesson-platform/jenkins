@@ -1,0 +1,83 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent { label 'agent-kubernetes' }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '40'))
+  }
+
+  parameters {
+    choice(name: 'TARGET_ENV', choices: ['dev', 'stage', 'prod'], description: 'Ambiente alvo.')
+    string(name: 'K8S_NAMESPACE', defaultValue: 'apps', description: 'Namespace do Kubernetes.')
+    string(name: 'K8S_DEPLOYMENT', defaultValue: 'myapp', description: 'Nome da implantacao Kubernetes.')
+    string(name: 'K8S_CONTAINER', defaultValue: 'app', description: 'Nome do container na implantacao.')
+    string(name: 'IMAGE', defaultValue: 'localhost:8082/apps/app:latest', description: 'Imagem para implantacao.')
+    string(name: 'KUBECONFIG_CREDENTIALS_ID', defaultValue: 'kubeconfig', description: 'ID da credencial de arquivo secreto com kubeconfig.')
+    booleanParam(name: 'APPROVAL_REQUIRED', defaultValue: true, description: 'Exigir aprovacao manual antes da implantacao.')
+    string(name: 'ROLLBACK_REVISION', defaultValue: '', description: 'Revisao de rollout Kubernetes opcional para reversao.')
+  }
+
+  stages {
+    stage('Validar Entradas') {
+      steps {
+        script {
+          if (params.TARGET_ENV == 'prod') {
+            validateRef(ref: env.BRANCH_NAME ?: env.TAG_NAME ?: '', releaseOnly: true)
+          }
+          sh 'kubectl version --client=true --output=yaml'
+          sh 'helm version --short'
+        }
+      }
+    }
+
+    stage('Aprovacao Manual') {
+      when { expression { return params.APPROVAL_REQUIRED } }
+      steps {
+        timeout(time: 30, unit: 'MINUTES') {
+          input message: "Aprovar implantacao Kubernetes em ${params.TARGET_ENV} namespace=${params.K8S_NAMESPACE} imagem=${params.IMAGE}?"
+        }
+      }
+    }
+
+    stage('Implantacao') {
+      steps {
+        withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIALS_ID, variable: 'KCFG')]) {
+          sh '''
+            set -e
+            export KUBECONFIG="${KCFG}"
+            kubectl -n "${K8S_NAMESPACE}" set image deployment/"${K8S_DEPLOYMENT}" "${K8S_CONTAINER}"="${IMAGE}" --record
+            kubectl -n "${K8S_NAMESPACE}" rollout status deployment/"${K8S_DEPLOYMENT}" --timeout=180s
+            kubectl -n "${K8S_NAMESPACE}" get deployment "${K8S_DEPLOYMENT}" -o wide
+          '''
+        }
+      }
+    }
+
+    stage('Reversao') {
+      when { expression { return params.ROLLBACK_REVISION?.trim() } }
+      steps {
+        withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIALS_ID, variable: 'KCFG')]) {
+          sh '''
+            set -e
+            export KUBECONFIG="${KCFG}"
+            kubectl -n "${K8S_NAMESPACE}" rollout undo deployment/"${K8S_DEPLOYMENT}" --to-revision="${ROLLBACK_REVISION}"
+            kubectl -n "${K8S_NAMESPACE}" rollout status deployment/"${K8S_DEPLOYMENT}" --timeout=180s
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CD K8s ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}
+
+

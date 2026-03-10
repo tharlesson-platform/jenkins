@@ -1,0 +1,10 @@
+ci:
+  failOnHighVulnerability: true
+  trivySeverity: "HIGH,CRITICAL"
+  sonarEnabledDefault: false
+cd:
+  requireApprovalByDefault: true
+  defaultEnvironments:
+    - dev
+    - stage
+    - prod
