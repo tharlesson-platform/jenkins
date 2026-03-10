@@ -1,0 +1,33 @@
+tool:
+  maven:
+    installations:
+      - name: "Maven-3.9"
+        properties:
+          - installSource:
+              installers:
+                - maven:
+                    id: "3.9.11"
+  gradle:
+    installations:
+      - name: "Gradle-8.10"
+        properties:
+          - installSource:
+              installers:
+                - gradleInstaller:
+                    id: "8.10.2"
+  nodejs:
+    installations:
+      - name: "Node-LTS-22"
+        properties:
+          - installSource:
+              installers:
+                - nodeJSInstaller:
+                    id: "22.11.0"
+  sonarRunnerInstallation:
+    installations:
+      - name: "SonarScanner-CLI"
+        properties:
+          - installSource:
+              installers:
+                - sonarRunnerInstaller:
+                    id: "7.1.0.4889"

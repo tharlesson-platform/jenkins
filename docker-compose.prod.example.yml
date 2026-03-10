@@ -1,0 +1,68 @@
+services:
+  jenkins-controller:
+    image: registry.example.com/devops/jenkins-controller:1.0.0
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+  sonarqube-db:
+    restart: always
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+
+  sonarqube:
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "9000:9000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+  nexus:
+    restart: always
+    ports:
+      - "8081:8081"
+      - "8082:8082"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+  nginx:
+    restart: always
+    ports:
+      - "80:80"
+
+  agent-java:
+    image: registry.example.com/devops/jenkins-agent-java:1.0.0
+    restart: always
+
+  agent-docker:
+    image: registry.example.com/devops/jenkins-agent-docker:1.0.0
+    restart: always

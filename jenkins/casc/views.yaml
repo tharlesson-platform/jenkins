@@ -1,0 +1,2 @@
+# Views opcionais podem ser gerenciadas via Job DSL em jenkins/seed-jobs/jobdsl/.
+# Este arquivo e mantido como ponto de extensao para futuras views via JCasC.

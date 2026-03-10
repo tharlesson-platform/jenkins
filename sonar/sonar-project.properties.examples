@@ -1,0 +1,21 @@
+# Exemplo para projeto Java
+sonar.projectKey=java-maven-app
+sonar.projectName=java-maven-app
+sonar.projectVersion=1.0.0
+sonar.sources=src/main
+sonar.tests=src/test
+sonar.java.binaries=target/classes
+sonar.junit.reportPaths=target/surefire-reports
+sonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+# Exemplo para projeto Python
+# sonar.projectKey=python-app
+# sonar.sources=app
+# sonar.tests=tests
+# sonar.python.coverage.reportPaths=coverage.xml
+
+# Exemplo para projeto Node
+# sonar.projectKey=node-app
+# sonar.sources=src
+# sonar.tests=test
+# sonar.javascript.lcov.reportPaths=coverage/lcov.info

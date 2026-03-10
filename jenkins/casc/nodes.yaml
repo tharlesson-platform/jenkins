@@ -1,0 +1,62 @@
+jenkins:
+  nodes:
+    - permanent:
+        name: "agent-java"
+        labelString: "agent-java java maven gradle"
+        mode: NORMAL
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            webSocket: true
+        retentionStrategy: "always"
+    - permanent:
+        name: "agent-python"
+        labelString: "agent-python python pip pytest"
+        mode: NORMAL
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            webSocket: true
+        retentionStrategy: "always"
+    - permanent:
+        name: "agent-node"
+        labelString: "agent-node node npm yarn"
+        mode: NORMAL
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            webSocket: true
+        retentionStrategy: "always"
+    - permanent:
+        name: "agent-go"
+        labelString: "agent-go go golang"
+        mode: NORMAL
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            webSocket: true
+        retentionStrategy: "always"
+    - permanent:
+        name: "agent-docker"
+        labelString: "agent-docker docker trivy buildx"
+        mode: NORMAL
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            webSocket: true
+        retentionStrategy: "always"
+    - permanent:
+        name: "agent-kubernetes"
+        labelString: "agent-kubernetes kubectl helm yq"
+        mode: NORMAL
+        numExecutors: 1
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            webSocket: true
+        retentionStrategy: "always"

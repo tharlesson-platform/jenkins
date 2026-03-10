@@ -1,0 +1,22 @@
+services:
+  jenkins-controller:
+    environment:
+      JAVA_OPTS: ${JENKINS_JAVA_OPTS:--Xms512m -Xmx1536m -Djenkins.install.runSetupWizard=false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  sonarqube:
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  nexus:
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"

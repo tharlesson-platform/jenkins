@@ -1,0 +1,64 @@
+jenkins:
+  disableRememberMe: true
+  securityRealm:
+    activeDirectory:
+      customDomain: true
+      domains:
+        - name: "${AD_DOMAIN:-example.local}"
+          servers: "${AD_SERVERS:-ad01.example.local:3268}"
+          bindName: "${AD_BIND_DN:-CN=svc_jenkins,OU=Service Accounts,DC=example,DC=local}"
+          bindPassword: "${AD_BIND_PASSWORD:-change_me_bind_password}"
+      groupLookupStrategy: AUTO
+      removeIrrelevantGroups: true
+      startTls: true
+      cache:
+        size: 1000
+        ttl: 600
+      internalUsersDatabase:
+        jenkinsInternalUser: "${JENKINS_ADMIN_USER:-admin}"
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+          - name: "jenkins-admins"
+            description: "Administradores da plataforma Jenkins"
+            permissions:
+              - "Overall/Administer"
+            assignments:
+              - "${AD_GROUP_ADMINS:-jenkins-admins}"
+          - name: "jenkins-developers"
+            description: "Desenvolvedores com permissao de leitura e build"
+            permissions:
+              - "Overall/Read"
+              - "View/Read"
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Workspace"
+              - "Job/Discover"
+              - "Run/Replay"
+              - "Run/Update"
+            assignments:
+              - "${AD_GROUP_DEVELOPERS:-jenkins-developers}"
+          - name: "jenkins-readonly"
+            description: "Acesso somente leitura"
+            permissions:
+              - "Overall/Read"
+              - "View/Read"
+              - "Job/Read"
+              - "Job/Discover"
+            assignments:
+              - "${AD_GROUP_READONLY:-jenkins-readonly}"
+          - name: "jenkins-release-managers"
+            description: "Gestores de release e deploy"
+            permissions:
+              - "Overall/Read"
+              - "View/Read"
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Job/Workspace"
+              - "Job/Discover"
+              - "Run/Replay"
+              - "Run/Update"
+            assignments:
+              - "${AD_GROUP_RELEASE_MANAGERS:-jenkins-release-managers}"

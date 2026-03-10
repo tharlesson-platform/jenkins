@@ -1,0 +1,128 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent { label 'agent-docker' }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '40', artifactNumToKeepStr: '30'))
+  }
+
+  parameters {
+    string(name: 'IMAGE_REGISTRY', defaultValue: 'localhost:8082', description: 'Endereco do registro.')
+    string(name: 'IMAGE_REPOSITORY', defaultValue: 'apps/generic-image', description: 'Repositorio da imagem.')
+    string(name: 'DOCKERFILE_PATH', defaultValue: 'Dockerfile', description: 'Caminho do Dockerfile.')
+    string(name: 'BUILD_CONTEXT', defaultValue: '.', description: 'Contexto da compilacao Docker.')
+    booleanParam(name: 'PUSH_IMAGE', defaultValue: false, description: 'Publicar tags da imagem no registro.')
+    booleanParam(name: 'GENERATE_SBOM', defaultValue: true, description: 'Gerar artefato de SBOM.')
+    booleanParam(name: 'FAIL_ON_TRIVY', defaultValue: true, description: 'Falhar em vulnerabilidades do Trivy.')
+    string(name: 'TRIVY_SEVERITY', defaultValue: 'HIGH,CRITICAL', description: 'Politica de severidade do Trivy.')
+    string(name: 'REGISTRY_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para login no registro.')
+  }
+
+  environment {
+    PRIMARY_IMAGE = ''
+    BRANCH_TAG = ''
+    SHA_TAG = ''
+    RELEASE_TAG = ''
+  }
+
+  stages {
+    stage('Coleta do Codigo') {
+      steps {
+        checkoutSource()
+      }
+    }
+
+    stage('Validar Dockerfile') {
+      steps {
+        sh '''
+          set -e
+          test -f "${DOCKERFILE_PATH}"
+          grep -E '^FROM\\s+' "${DOCKERFILE_PATH}" >/dev/null
+          docker buildx version
+        '''
+      }
+    }
+
+    stage('Preparar Tags') {
+      steps {
+        script {
+          String branchName = (env.BRANCH_NAME ?: 'local').toLowerCase().replaceAll(/[^a-z0-9._-]/, '-')
+          String shortSha = sh(script: 'git rev-parse --short=8 HEAD', returnStdout: true).trim()
+          env.BRANCH_TAG = branchName
+          env.SHA_TAG = shortSha
+          env.RELEASE_TAG = env.TAG_NAME ? env.TAG_NAME.toLowerCase().replaceAll(/[^a-z0-9._-]/, '-') : ''
+          env.PRIMARY_IMAGE = "${params.IMAGE_REGISTRY}/${params.IMAGE_REPOSITORY}:${env.SHA_TAG}"
+        }
+        echo "Tags -> branch=${env.BRANCH_TAG}, sha=${env.SHA_TAG}, release=${env.RELEASE_TAG}"
+      }
+    }
+
+    stage('Construir Imagem com Buildx') {
+      steps {
+        sh '''
+          set -e
+          docker buildx build --load \
+            -f "${DOCKERFILE_PATH}" \
+            -t "${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${BRANCH_TAG}" \
+            -t "${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${SHA_TAG}" \
+            ${RELEASE_TAG:+-t ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${RELEASE_TAG}} \
+            "${BUILD_CONTEXT}"
+        '''
+      }
+    }
+
+    stage('Analise Trivy') {
+      steps {
+        runTrivyScan(
+          image: env.PRIMARY_IMAGE,
+          severity: params.TRIVY_SEVERITY,
+          failOnVuln: params.FAIL_ON_TRIVY,
+          reportFile: 'reports/trivy-container-image.json'
+        )
+      }
+    }
+
+    stage('Gerar SBOM') {
+      when { expression { return params.GENERATE_SBOM } }
+      steps {
+        sh '''
+          set -e
+          mkdir -p reports
+          trivy image --format cyclonedx --output reports/sbom.cdx.json "${PRIMARY_IMAGE}" || true
+        '''
+        archiveArtifacts artifacts: 'reports/sbom.cdx.json', allowEmptyArchive: true
+      }
+    }
+
+    stage('Publicar Tags') {
+      when { expression { return params.PUSH_IMAGE } }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIALS_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+          sh '''
+            set -e
+            echo "${REGISTRY_PASS}" | docker login "${IMAGE_REGISTRY}" -u "${REGISTRY_USER}" --password-stdin
+            docker push "${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${BRANCH_TAG}"
+            docker push "${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${SHA_TAG}"
+            if [ -n "${RELEASE_TAG}" ]; then
+              docker push "${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${RELEASE_TAG}"
+            fi
+            docker logout "${IMAGE_REGISTRY}" || true
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CI Container ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}
+
+

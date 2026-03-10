@@ -1,0 +1,186 @@
+@Library('jenkins-shared-lib') _
+
+pipeline {
+  agent none
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '20'))
+  }
+
+  parameters {
+    string(name: 'GO_BUILD_IMAGE', defaultValue: 'golang:1.24-bookworm', description: 'Imagem base para build Go.')
+    string(name: 'GO_LINT_IMAGE', defaultValue: 'golangci/golangci-lint:v1.61.0', description: 'Imagem base para lint Go.')
+    booleanParam(name: 'ENABLE_SONAR', defaultValue: false, description: 'Executar analise SonarQube.')
+    booleanParam(name: 'PUBLISH_ARTIFACT', defaultValue: true, description: 'Publicar artefato binario no repo raw do Nexus.')
+    booleanParam(name: 'ENABLE_IMAGE_BUILD', defaultValue: false, description: 'Compilar imagem de container.')
+    booleanParam(name: 'ENABLE_IMAGE_PUSH', defaultValue: false, description: 'Publicar imagem de container.')
+    booleanParam(name: 'FAIL_ON_TRIVY', defaultValue: true, description: 'Falhar em vulnerabilidades encontradas pelo Trivy.')
+    string(name: 'GO_BUILD_OUTPUT', defaultValue: 'dist/app', description: 'Caminho de saida da compilacao Go.')
+    string(name: 'SONAR_PROJECT_KEY', defaultValue: 'go-service', description: 'Chave do projeto Sonar.')
+    string(name: 'NEXUS_URL', defaultValue: 'http://nexus:8081', description: 'URL base do Nexus.')
+    string(name: 'NEXUS_RAW_REPO', defaultValue: 'raw-hosted', description: 'Nome do repositorio raw no Nexus.')
+    string(name: 'NEXUS_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para publicacao no Nexus.')
+    string(name: 'IMAGE_REGISTRY', defaultValue: 'localhost:8082', description: 'Endereco do registro de container.')
+    string(name: 'IMAGE_REPOSITORY', defaultValue: 'apps/go-service', description: 'Repositorio da imagem.')
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Sobrescrita da tag da imagem.')
+    string(name: 'TRIVY_SEVERITY', defaultValue: 'HIGH,CRITICAL', description: 'Politica de severidade do Trivy.')
+    string(name: 'REGISTRY_CREDENTIALS_ID', defaultValue: 'nexus-ci', description: 'ID de credencial para login no registro.')
+  }
+
+  stages {
+    stage('Coleta do Codigo') {
+      agent { label 'agent-docker' }
+      steps {
+        checkoutSource()
+        sh 'git rev-parse --short=8 HEAD > .git/short_sha'
+        stash name: 'src', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('Formatacao, Vet e Testes em Container Base') {
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'src'
+        runInBaseContainer(
+          image: params.GO_BUILD_IMAGE,
+          command: '''
+            set -e
+            mkdir -p reports
+            go fmt ./...
+            go vet ./...
+            go test ./... -coverprofile=reports/coverage.out -covermode=atomic
+            go tool cover -func=reports/coverage.out > reports/coverage.txt
+          ''',
+          label: 'Formatacao/Vet/Testes Go em container base'
+        )
+
+        runInBaseContainer(
+          image: params.GO_LINT_IMAGE,
+          command: '''
+            set -e
+            mkdir -p reports
+            golangci-lint run --out-format checkstyle > reports/golangci-lint.xml || true
+          ''',
+          label: 'Lint Go em container base'
+        )
+
+        archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+        stash name: 'go-tested', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('Construir Binario em Container Base') {
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'go-tested'
+        runInBaseContainer(
+          image: params.GO_BUILD_IMAGE,
+          command: """
+            set -e
+            mkdir -p dist
+            go build -o ${params.GO_BUILD_OUTPUT} ./...
+            [ -f "${params.GO_BUILD_OUTPUT}" ]
+          """,
+          label: 'Compilar binario Go em container base'
+        )
+        archiveArtifacts artifacts: 'dist/**', allowEmptyArchive: false
+        stash name: 'go-build', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('SonarQube') {
+      when { expression { return params.ENABLE_SONAR } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'go-build'
+        script {
+          String scannerHome = tool 'SonarScanner-CLI'
+          runSonarScan(
+            enabled: true,
+            serverName: 'sonarqube',
+            command: "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${params.SONAR_PROJECT_KEY} -Dsonar.sources=. -Dsonar.go.coverage.reportPaths=reports/coverage.out",
+            waitForQualityGate: false
+          )
+        }
+      }
+    }
+
+    stage('Publicar Artefato') {
+      when { expression { return params.PUBLISH_ARTIFACT } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'go-build'
+        publishArtifact(
+          type: 'raw',
+          repository: params.NEXUS_RAW_REPO,
+          nexusUrl: params.NEXUS_URL,
+          credentialsId: params.NEXUS_CREDENTIALS_ID,
+          file: params.GO_BUILD_OUTPUT,
+          targetPath: "go/${env.JOB_NAME}/${env.BUILD_NUMBER}/app"
+        )
+      }
+    }
+
+    stage('Construir Imagem de Container') {
+      when { expression { return params.ENABLE_IMAGE_BUILD } }
+      agent { label 'agent-docker' }
+      steps {
+        unstash 'go-build'
+        script {
+          String shortSha = fileExists('.git/short_sha') ? readFile('.git/short_sha').trim() : "${env.BUILD_NUMBER}"
+          String imageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : shortSha
+          env.BUILD_IMAGE = "${params.IMAGE_REGISTRY}/${params.IMAGE_REPOSITORY}:${imageTag}"
+        }
+        sh '''
+          set -e
+          docker build -t "${BUILD_IMAGE}" .
+          docker image inspect "${BUILD_IMAGE}" >/dev/null
+        '''
+      }
+    }
+
+    stage('Scan de Imagem com Trivy') {
+      when { expression { return params.ENABLE_IMAGE_BUILD } }
+      agent { label 'agent-docker' }
+      steps {
+        runTrivyScan(
+          image: env.BUILD_IMAGE,
+          severity: params.TRIVY_SEVERITY,
+          failOnVuln: params.FAIL_ON_TRIVY,
+          reportFile: 'reports/trivy-go-image.json'
+        )
+      }
+    }
+
+    stage('Publicar Imagem') {
+      when {
+        allOf {
+          expression { return params.ENABLE_IMAGE_BUILD }
+          expression { return params.ENABLE_IMAGE_PUSH }
+        }
+      }
+      agent { label 'agent-docker' }
+      steps {
+        withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIALS_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+          sh '''
+            set -e
+            REGISTRY_HOST="$(echo "${BUILD_IMAGE}" | cut -d/ -f1)"
+            echo "${REGISTRY_PASS}" | docker login "${REGISTRY_HOST}" -u "${REGISTRY_USER}" --password-stdin
+            docker push "${BUILD_IMAGE}"
+            docker logout "${REGISTRY_HOST}" || true
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      notifyBuild(status: currentBuild.currentResult, message: "CI Go ${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${currentBuild.currentResult}")
+      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true, disableDeferredWipeout: true)
+    }
+  }
+}

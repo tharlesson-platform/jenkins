@@ -1,0 +1,74 @@
+# -----------------------------------------------------------------------------
+# Jenkins Platform - catalogo de plugins
+# Notas:
+# - Mantenha este arquivo versionado e revise atualizacoes antes de promover.
+# - Voce pode fixar versoes como "plugin-id:versao" apos validar baseline.
+# -----------------------------------------------------------------------------
+
+# Configuration as Code e automacao
+configuration-as-code
+job-dsl
+
+# Core de pipeline e multibranch
+workflow-aggregator
+workflow-multibranch
+pipeline-stage-view
+pipeline-utility-steps
+pipeline-model-definition
+pipeline-github-lib
+pipeline-groovy-lib
+cloudbees-folder
+
+# Integracoes SCM
+git
+git-client
+github
+github-branch-source
+gitlab-plugin
+branch-api
+scm-api
+
+# Credenciais e seguranca
+credentials
+credentials-binding
+plain-credentials
+ssh-credentials
+active-directory
+role-strategy
+matrix-auth
+mask-passwords
+ssh-agent
+
+# Qualidade de vida de build e workspace
+timestamper
+ws-cleanup
+ansicolor
+build-timeout
+
+# Relatorios e qualidade de codigo
+junit
+warnings-ng
+jacoco
+htmlpublisher
+sonar
+dependency-check-jenkins-plugin
+
+# Containers, cloud e artefatos
+docker-workflow
+docker-plugin
+kubernetes
+kubernetes-cli
+nexus-artifact-uploader
+gradle
+nodejs
+
+# Colaboracao e governanca opcionais
+email-ext
+slack
+office-365-connector
+lockable-resources
+generic-webhook-trigger
+git-parameter
+
+# UI opcional (desabilite se quiser somente interface LTS enxuta)
+blueocean

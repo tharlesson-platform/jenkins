@@ -1,0 +1,6 @@
+pytest
+coverage
+flake8
+bandit
+pip-audit
+build
