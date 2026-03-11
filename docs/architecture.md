@@ -1,4 +1,4 @@
-# Arquitetura
+﻿# Arquitetura
 
 ## Objetivos
 

@@ -1,4 +1,4 @@
-ci:
+﻿ci:
   failOnHighVulnerability: true
   trivySeverity: "HIGH,CRITICAL"
   sonarEnabledDefault: false

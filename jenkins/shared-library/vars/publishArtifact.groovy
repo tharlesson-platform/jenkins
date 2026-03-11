@@ -1,4 +1,4 @@
-def call(Map cfg = [:]) {
+﻿def call(Map cfg = [:]) {
   String type = cfg.get('type', 'raw')
   String credentialsId = cfg.get('credentialsId', 'nexus-ci')
   String nexusUrl = cfg.get('nexusUrl', env.NEXUS_URL ?: 'http://nexus:8081')

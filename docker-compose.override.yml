@@ -1,4 +1,4 @@
-services:
+﻿services:
   jenkins-controller:
     environment:
       JAVA_OPTS: ${JENKINS_JAVA_OPTS:--Xms512m -Xmx1536m -Djenkins.install.runSetupWizard=false}

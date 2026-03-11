@@ -1,4 +1,4 @@
-# Seguranca
+﻿# Seguranca
 
 ## Base de seguranca deste repositorio
 

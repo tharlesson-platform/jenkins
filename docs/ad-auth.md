@@ -1,4 +1,4 @@
-# Autenticacao Active Directory
+﻿# Autenticacao Active Directory
 
 ## O que esta configurado
 

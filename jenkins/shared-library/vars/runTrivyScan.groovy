@@ -1,4 +1,4 @@
-def call(Map cfg = [:]) {
+﻿def call(Map cfg = [:]) {
   String image = cfg.get('image', '')
   if (!image?.trim()) {
     error('runTrivyScan exige nome da imagem.')

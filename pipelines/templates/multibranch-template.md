@@ -1,4 +1,4 @@
-# Modelo de Multibranch
+﻿# Modelo de Multibranch
 
 Use este modelo ao integrar um novo repositorio no fluxo multibranch do Jenkins.
 

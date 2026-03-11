@@ -1,4 +1,4 @@
-folder('CI') {
+﻿folder('CI') {
   description('Pipelines de Integracao Continua')
 }
 folder('CI/Java') {

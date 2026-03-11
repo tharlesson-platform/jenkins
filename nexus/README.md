@@ -1,4 +1,4 @@
-# Integracao Nexus OSS
+﻿# Integracao Nexus OSS
 
 O Nexus e o repositorio central de artefatos para Maven, npm, PyPI, Go e imagens Docker.
 

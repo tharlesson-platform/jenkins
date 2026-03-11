@@ -1,4 +1,4 @@
-def call(Map cfg = [:], Closure body) {
+﻿def call(Map cfg = [:], Closure body) {
   node(cfg.get('label', 'agent-kubernetes')) {
     timestamps {
       ansiColor('xterm') {

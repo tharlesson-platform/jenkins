@@ -1,4 +1,4 @@
-import org.company.devops.PipelineUtils
+﻿import org.company.devops.PipelineUtils
 
 def call(Map cfg = [:]) {
   String ref = cfg.get('ref', env.BRANCH_NAME ?: env.TAG_NAME ?: '')

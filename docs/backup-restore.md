@@ -1,4 +1,4 @@
-# Backup e Restauracao
+﻿# Backup e Restauracao
 
 ## Escopo
 

@@ -1,4 +1,4 @@
-import jenkins.model.Jenkins
+﻿import jenkins.model.Jenkins
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
 

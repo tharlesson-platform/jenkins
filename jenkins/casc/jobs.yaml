@@ -1,4 +1,4 @@
-jobs:
+﻿jobs:
   - script: |
       folder('CI') {
         description('Pipelines de Integracao Continua')

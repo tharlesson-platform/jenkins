@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-jenkins-platform}
+﻿name: ${COMPOSE_PROJECT_NAME:-jenkins-platform}
 
 x-default-env: &default-env
   TZ: ${TZ:-America/Sao_Paulo}

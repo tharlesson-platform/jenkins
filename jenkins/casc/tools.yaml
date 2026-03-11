@@ -1,4 +1,4 @@
-tool:
+﻿tool:
   maven:
     installations:
       - name: "Maven-3.9"

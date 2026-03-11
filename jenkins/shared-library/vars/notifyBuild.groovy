@@ -1,4 +1,4 @@
-def call(Map cfg = [:]) {
+﻿def call(Map cfg = [:]) {
   String status = cfg.get('status', currentBuild.currentResult ?: 'UNKNOWN')
   String channel = cfg.get('channel', '')
   String message = cfg.get('message', "${env.JOB_NAME} #${env.BUILD_NUMBER} -> ${status}")

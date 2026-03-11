@@ -1,4 +1,4 @@
-# go-app
+﻿# go-app
 
 Exemplo minimo em Go para validacao de CI no Jenkins.
 

@@ -1,4 +1,4 @@
-package org.company.devops
+﻿package org.company.devops
 
 class PipelineUtils implements Serializable {
   static boolean envAsBool(def script, String key, boolean defaultValue = false) {

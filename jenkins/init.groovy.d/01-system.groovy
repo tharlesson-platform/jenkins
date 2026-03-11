@@ -1,4 +1,4 @@
-import hudson.model.Node
+﻿import hudson.model.Node
 import jenkins.model.Jenkins
 
 def jenkins = Jenkins.get()

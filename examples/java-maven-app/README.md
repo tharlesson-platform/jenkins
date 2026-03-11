@@ -1,4 +1,4 @@
-# java-maven-app
+﻿# java-maven-app
 
 Exemplo minimo em Java 21 + Maven para validacao de CI no Jenkins.
 

@@ -1,4 +1,4 @@
-# -----------------------------------------------------------------------------
+﻿# -----------------------------------------------------------------------------
 # Jenkins Platform - catalogo de plugins
 # Notas:
 # - Mantenha este arquivo versionado e revise atualizacoes antes de promover.

@@ -1,4 +1,4 @@
-# Convencoes de Nomenclatura
+﻿# Convencoes de Nomenclatura
 
 ## Convencoes de pasta
 

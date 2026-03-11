@@ -1,4 +1,4 @@
-# Padroes de Pipeline
+﻿# Padroes de Pipeline
 
 ## Estagios obrigatorios (CI)
 

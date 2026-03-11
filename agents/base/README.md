@@ -1,4 +1,4 @@
-# Imagem Base de Agente
+﻿# Imagem Base de Agente
 
 Esta imagem base padroniza a inicializacao do inbound-agent com resolucao automatica de segredo.
 

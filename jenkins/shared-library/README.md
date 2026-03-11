@@ -1,4 +1,4 @@
-# Biblioteca Compartilhada Jenkins
+﻿# Biblioteca Compartilhada Jenkins
 
 Funcoes reutilizaveis de pipeline para padronizacao de CI/CD.
 

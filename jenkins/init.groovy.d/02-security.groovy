@@ -1,4 +1,4 @@
-import hudson.security.HudsonPrivateSecurityRealm
+﻿import hudson.security.HudsonPrivateSecurityRealm
 import jenkins.model.Jenkins
 
 def jenkins = Jenkins.get()

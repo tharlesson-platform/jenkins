@@ -1,4 +1,4 @@
-def call(Map cfg = [:], Closure body = null) {
+﻿def call(Map cfg = [:], Closure body = null) {
   List<String> envList = []
 
   if (cfg.get('mavenTool')) {

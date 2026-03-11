@@ -1,4 +1,4 @@
-ARG JENKINS_VERSION=lts-jdk21
+﻿ARG JENKINS_VERSION=lts-jdk21
 FROM jenkins/jenkins:${JENKINS_VERSION}
 
 USER root

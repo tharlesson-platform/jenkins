@@ -1,4 +1,4 @@
-# Operacoes
+﻿# Operacoes
 
 ## Pre-requisitos
 

@@ -1,4 +1,4 @@
-# Plugins
+﻿# Plugins
 
 Fonte da verdade: [`jenkins/plugins.txt`](../jenkins/plugins.txt)
 

@@ -1,4 +1,4 @@
-def call(Map cfg = [:]) {
+﻿def call(Map cfg = [:]) {
   String branch = cfg.get('branch', '')
   String credentialsId = cfg.get('credentialsId', '')
 

@@ -1,4 +1,4 @@
-services:
+﻿services:
   jenkins-controller:
     image: registry.example.com/devops/jenkins-controller:1.0.0
     restart: always

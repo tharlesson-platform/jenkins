@@ -1,4 +1,4 @@
-def call(Map cfg = [:]) {
+﻿def call(Map cfg = [:]) {
   if (!cfg.get('enabled', false)) {
     echo '[runSonarScan] Scan Sonar desabilitado.'
     return

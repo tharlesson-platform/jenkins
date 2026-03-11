@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "node-app",
   "version": "1.0.0",
   "description": "Minimal Node sample for Jenkins CI validation",

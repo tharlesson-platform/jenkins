@@ -1,4 +1,4 @@
-def call(Map cfg = [:]) {
+﻿def call(Map cfg = [:]) {
   String image = (cfg.get('image', '') as String).trim()
   if (!image) {
     error('runInBaseContainer exige parametro image.')

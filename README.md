@@ -1,4 +1,4 @@
-# Monorepo da Plataforma Jenkins (Controller + Agents)
+﻿# Monorepo da Plataforma Jenkins (Controller + Agents)
 
 Inicializacao de plataforma Jenkins pronta para producao, com abordagem 100% como codigo:
 

@@ -1,4 +1,4 @@
-# Catalogo de Agentes Jenkins
+﻿# Catalogo de Agentes Jenkins
 
 Todas as imagens sao agentes inbound e sao opcionais via perfis do compose.
 

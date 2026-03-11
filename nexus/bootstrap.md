@@ -1,4 +1,4 @@
-# Guia de Inicializacao do Nexus
+﻿# Guia de Inicializacao do Nexus
 
 ## Objetivo
 
