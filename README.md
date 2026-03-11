@@ -190,3 +190,34 @@ Checklist completo e modelo de decisao GO/NO-GO:
 2. Controles avancados de cadeia de suprimentos (assinatura, atestacao, gates de politica).
 3. Perfil opcional de implantacao Jenkins nativo em Kubernetes.
 4. Plano de observabilidade completa (metricas, logs, rastreamento).
+
+## Licenca
+
+Este projeto esta licenciado sob a Apache License 2.0. Consulte o arquivo `LICENSE` para mais detalhes.
+
+## Atribuicao
+
+Este projeto foi desenvolvido e publicado por **Tharlesson**.
+Caso voce utilize este material como base em ambientes internos, estudos, adaptacoes ou redistribuicoes,
+preserve os creditos de autoria e os avisos de licenca aplicaveis.
+
+## Creditos e Uso
+
+Este repositorio foi criado com foco em automacao, padronizacao operacional e melhoria da rotina de profissionais
+de SRE, DevOps, Cloud e Plataforma.
+
+Voce pode:
+- estudar
+- reutilizar
+- adaptar
+- evoluir este projeto dentro do seu contexto
+
+Ao reutilizar ou derivar este material:
+- mantenha os avisos de licenca
+- preserve os creditos de autoria quando aplicavel
+- documente alteracoes relevantes feitas sobre a base original
+
+## Autor
+
+**Tharlesson**  
+GitHub: https://github.com/tharlesson
