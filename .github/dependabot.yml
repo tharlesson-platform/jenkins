@@ -1,0 +1,114 @@
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/agents/base"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/agents/docker"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/agents/go"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/agents/java"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/agents/kubernetes"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/agents/node"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/agents/python"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/examples/go-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/examples/java-maven-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/examples/node-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/examples/python-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/jenkins"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "gomod"
+    directory: "/examples/go-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "maven"
+    directory: "/examples/java-maven-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "npm"
+    directory: "/examples/node-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "pip"
+    directory: "/examples/python-app"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
