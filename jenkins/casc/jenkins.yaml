@@ -14,11 +14,9 @@
   markupFormatter:
     plainText: {}
   projectNamingStrategy:
-    standard:
-      forceExistingJobs: false
+    standard: {}
   crumbIssuer:
-    standard:
-      excludeClientIPFromCrumb: false
+    standard: {}
 
 unclassified:
   location:
@@ -39,4 +37,3 @@ unclassified:
               git:
                 remote: "${SHARED_LIBRARY_REPO_URL:-https://github.com/example/jenkins-platform.git}"
                 credentialsId: "${SHARED_LIBRARY_CREDENTIALS_ID:-}"
-
