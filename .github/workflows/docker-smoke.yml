@@ -1,0 +1,41 @@
+name: Docker Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Validate shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in scripts/*.sh; do
+            bash -n "${script}"
+          done
+
+      - name: Render compose config
+        run: docker compose config >/dev/null
+
+      - name: Start Jenkins controller
+        run: docker compose up -d --build jenkins-controller
+
+      - name: Wait for Jenkins
+        run: ./scripts/wait-for-services.sh http://localhost:8080/login 300
+
+      - name: Run smoke tests
+        run: ./scripts/smoke-tests.sh
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
