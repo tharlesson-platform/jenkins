@@ -16,8 +16,7 @@
   projectNamingStrategy:
     standard: {}
   crumbIssuer:
-    standard:
-      excludeClientIPFromCrumb: false
+    standard: {}
 
 unclassified:
   location:
