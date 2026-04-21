@@ -24,8 +24,8 @@
             description: "Administradores da plataforma Jenkins"
             permissions:
               - "Overall/Administer"
-            assignments:
-              - "${AD_GROUP_ADMINS:-jenkins-admins}"
+            entries:
+              - group: "${AD_GROUP_ADMINS:-jenkins-admins}"
           - name: "jenkins-developers"
             description: "Desenvolvedores com permissao de leitura e build"
             permissions:
@@ -37,8 +37,8 @@
               - "Job/Discover"
               - "Run/Replay"
               - "Run/Update"
-            assignments:
-              - "${AD_GROUP_DEVELOPERS:-jenkins-developers}"
+            entries:
+              - group: "${AD_GROUP_DEVELOPERS:-jenkins-developers}"
           - name: "jenkins-readonly"
             description: "Acesso somente leitura"
             permissions:
@@ -46,8 +46,8 @@
               - "View/Read"
               - "Job/Read"
               - "Job/Discover"
-            assignments:
-              - "${AD_GROUP_READONLY:-jenkins-readonly}"
+            entries:
+              - group: "${AD_GROUP_READONLY:-jenkins-readonly}"
           - name: "jenkins-release-managers"
             description: "Gestores de release e deploy"
             permissions:
@@ -60,5 +60,5 @@
               - "Job/Discover"
               - "Run/Replay"
               - "Run/Update"
-            assignments:
-              - "${AD_GROUP_RELEASE_MANAGERS:-jenkins-release-managers}"
+            entries:
+              - group: "${AD_GROUP_RELEASE_MANAGERS:-jenkins-release-managers}"

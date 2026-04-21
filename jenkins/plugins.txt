@@ -1,4 +1,4 @@
-﻿# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Jenkins Platform - catalogo de plugins
 # Notas:
 # - Mantenha este arquivo versionado e revise atualizacoes antes de promover.
@@ -65,7 +65,6 @@ nodejs
 # Colaboracao e governanca opcionais
 email-ext
 slack
-office-365-connector
 lockable-resources
 generic-webhook-trigger
 git-parameter
