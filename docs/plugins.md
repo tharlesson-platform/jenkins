@@ -71,11 +71,10 @@ Fonte da verdade: [`jenkins/plugins.txt`](../jenkins/plugins.txt)
 
 1. `email-ext`: notificacoes avancadas por email.
 2. `slack`: notificacoes Slack.
-3. `office-365-connector`: webhook Teams/Office365.
-4. `lockable-resources`: serializa uso de implantacao/infra compartilhada.
-5. `generic-webhook-trigger`: acionamento por webhook generico.
-6. `git-parameter`: parametros para selecao branch/tag.
-7. `ssh-agent`: agente de chave SSH para etapas de implantacao.
+3. `lockable-resources`: serializa uso de implantacao/infra compartilhada.
+4. `generic-webhook-trigger`: acionamento por webhook generico.
+5. `git-parameter`: parametros para selecao branch/tag.
+6. `ssh-agent`: agente de chave SSH para etapas de implantacao.
 
 ### Interface opcional
 

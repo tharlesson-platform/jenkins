@@ -65,7 +65,6 @@ nodejs
 # Colaboracao e governanca opcionais
 email-ext
 slack
-office-365-connector
 lockable-resources
 generic-webhook-trigger
 git-parameter
