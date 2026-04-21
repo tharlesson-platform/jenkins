@@ -184,6 +184,15 @@ Checklist completo e modelo de decisao GO/NO-GO:
 
 - [docs/preflight-production.md](docs/preflight-production.md)
 
+## CI de smoke
+
+O repositorio agora inclui `.github/workflows/docker-smoke.yml` para:
+
+1. validar scripts shell
+2. renderizar `docker compose config`
+3. subir o `jenkins-controller`
+4. executar `scripts/smoke-tests.sh`
+
 ## Roteiro de evolucao
 
 1. Automacao de seed em escala para multiplos repositorios/organizacoes.
