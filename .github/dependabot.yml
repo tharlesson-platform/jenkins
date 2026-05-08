@@ -7,6 +7,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/agents/docker"
     schedule:
@@ -14,6 +19,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/agents/go"
     schedule:
@@ -21,6 +31,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/agents/java"
     schedule:
@@ -28,6 +43,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/agents/kubernetes"
     schedule:
@@ -35,6 +55,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/agents/node"
     schedule:
@@ -42,6 +67,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/agents/python"
     schedule:
@@ -49,6 +79,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/examples/go-app"
     schedule:
@@ -56,6 +91,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/examples/java-maven-app"
     schedule:
@@ -63,6 +103,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/examples/node-app"
     schedule:
@@ -70,6 +115,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/examples/python-app"
     schedule:
@@ -77,6 +127,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "docker"
     directory: "/jenkins"
     schedule:
@@ -84,6 +139,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "gomod"
     directory: "/examples/go-app"
     schedule:
@@ -91,6 +151,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "maven"
     directory: "/examples/java-maven-app"
     schedule:
@@ -98,6 +163,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "npm"
     directory: "/examples/node-app"
     schedule:
@@ -105,6 +175,11 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
   - package-ecosystem: "pip"
     directory: "/examples/python-app"
     schedule:
@@ -112,3 +187,8 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
