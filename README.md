@@ -289,3 +289,10 @@ candidatos anteriores congelados. Rollback desta fase: não publicar/admitir a f
 
 O smoke test aceita a revisão de pacote Ubuntu na versão do Docker Compose
 (por exemplo, `2.40.3+ds1-0ubuntu1~24.04.1`), mantendo o mínimo 2.24.4.
+
+O controller converte apenas os mirrors oficiais Debian já configurados para
+HTTPS antes do APT, com CA e assinaturas preservadas. O proxy isolado precisa
+permitir os destinos oficiais de pacotes, Trivy e plugins Jenkins por HTTPS;
+a alteração do proxy é validada e ativada após drenagem dos jobs em andamento.
+A instalação de plugins no build usa o archive oficial HTTPS do Jenkins;
+checksums e validações do instalador permanecem ativos.

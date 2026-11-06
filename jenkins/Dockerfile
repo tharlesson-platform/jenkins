@@ -4,7 +4,16 @@ FROM jenkins/jenkins:${JENKINS_VERSION}
 USER root
 
 # Ferramentas utilitarias no controller (evitar builds pesados aqui; usar agents para execucao)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Official Debian mirrors use HTTPS through the isolated CI egress proxy.
+# Keep APT signature verification and require the base image's trusted CA bundle.
+RUN set -eu; \
+    test -s /etc/ssl/certs/ca-certificates.crt; \
+    for source in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do \
+      [ ! -f "$source" ] || sed -i \
+        -e 's|http://deb\.debian\.org/|https://deb.debian.org/|g' \
+        -e 's|http://security\.debian\.org/|https://security.debian.org/|g' "$source"; \
+    done; \
+    apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     git \
@@ -26,7 +35,9 @@ RUN curl -fsSL https://aquasecurity.github.io/trivy-repo/deb/public.key \
 USER jenkins
 
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
-RUN jenkins-plugin-cli --verbose --plugin-file /usr/share/jenkins/ref/plugins.txt
+# Use the official stable archive for this build; retain plugin integrity checks.
+RUN JENKINS_UC_DOWNLOAD=https://archives.jenkins.io \
+    jenkins-plugin-cli --verbose --plugin-file /usr/share/jenkins/ref/plugins.txt
 
 # Bootstrap as code
 COPY casc/ /usr/share/jenkins/ref/casc/
