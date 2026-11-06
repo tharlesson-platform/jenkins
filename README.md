@@ -296,3 +296,9 @@ permitir os destinos oficiais de pacotes, Trivy e plugins Jenkins por HTTPS;
 a alteração do proxy é validada e ativada após drenagem dos jobs em andamento.
 A instalação de plugins no build usa o archive oficial HTTPS do Jenkins;
 checksums e validações do instalador permanecem ativos.
+
+O smoke isolado passa o proxy HTTP/HTTPS ao instalador Java por propriedades
+JVM, pois o Java não utiliza automaticamente `HTTP_PROXY`/`HTTPS_PROXY`. O
+argumento `JENKINS_PLUGIN_JAVA_OPTS` é opcional e restrito ao build; o override
+CI também configura o Java do controller. Builds e runtime fora do CI mantêm
+seus defaults. Nenhuma verificação TLS, assinatura APT ou checksum é desativada.

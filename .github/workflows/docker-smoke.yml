@@ -20,6 +20,7 @@ env:
   COMPOSE_PROJECT_NAME: jenkins-ci-${{ github.run_id }}-${{ github.run_attempt }}
   COMPOSE_PROFILES: ""
   JENKINS_JAVA_OPTS: -Xms256m -Xmx768m -Djenkins.install.runSetupWizard=false
+  JENKINS_CI_JAVA_PROXY_OPTS: -Dhttp.proxyHost=192.168.5.100 -Dhttp.proxyPort=3128 -Dhttps.proxyHost=192.168.5.100 -Dhttps.proxyPort=3128
 
 jobs:
   smoke:
@@ -124,11 +125,14 @@ jobs:
           cat > "$override_file" <<'YAML'
           services:
             jenkins-controller:
+              build:
+                args:
+                  JENKINS_PLUGIN_JAVA_OPTS: ${JENKINS_CI_JAVA_PROXY_OPTS}
               container_name: ${COMPOSE_PROJECT_NAME}-controller
               mem_limit: 1280m
               cpus: 1.5
               environment:
-                JAVA_OPTS: ${JENKINS_JAVA_OPTS}
+                JAVA_OPTS: "${JENKINS_JAVA_OPTS} ${JENKINS_CI_JAVA_PROXY_OPTS}"
               ports: !override
                 - "127.0.0.1:8080:8080"
                 - "127.0.0.1:50000:50000"

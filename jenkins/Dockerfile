@@ -36,7 +36,9 @@ USER jenkins
 
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 # Use the official stable archive for this build; retain plugin integrity checks.
-RUN JENKINS_UC_DOWNLOAD=https://archives.jenkins.io \
+ARG JENKINS_PLUGIN_JAVA_OPTS=""
+RUN JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}${JENKINS_PLUGIN_JAVA_OPTS:+ ${JENKINS_PLUGIN_JAVA_OPTS}}" \
+    JENKINS_UC_DOWNLOAD=https://archives.jenkins.io \
     jenkins-plugin-cli --verbose --plugin-file /usr/share/jenkins/ref/plugins.txt
 
 # Bootstrap as code
