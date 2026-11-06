@@ -103,7 +103,7 @@ jobs:
           import re
           import sys
           value = sys.argv[1].removeprefix('v')
-          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', value):
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.~+-]+)?', value):
               raise SystemExit('Unrecognized Docker Compose version')
           version = tuple(map(int, re.match(r'([0-9]+)\.([0-9]+)\.([0-9]+)', value).groups()))
           if version < (2, 24, 4):

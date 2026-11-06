@@ -286,3 +286,6 @@ Nenhum Docker build/run/up, serviço, AD, VM ou smoke real foi executado no host
 Revisão independente Main e smoke Linux ARM64 real permanecem pendentes.
 Sem Root/runtime/API write, commit/push, produção, billing ou alterações nos
 candidatos anteriores congelados. Rollback desta fase: não publicar/admitir a fonte.
+
+O smoke test aceita a revisão de pacote Ubuntu na versão do Docker Compose
+(por exemplo, `2.40.3+ds1-0ubuntu1~24.04.1`), mantendo o mínimo 2.24.4.
