@@ -230,3 +230,75 @@ Ao reutilizar ou derivar este material:
 
 **Tharlesson**  
 GitHub: https://github.com/tharlesson
+
+## Smoke de CI em VM ARM64 isolada
+
+`Docker Smoke / smoke` e `guardrails` usam a label exclusiva
+`jenkins-run-${{ github.run_id }}`, checkout da action por commit completo e
+head exato do PR ou SHA do push, sem persistir credenciais. Os gatilhos PR/push
+existentes são preservados; permissões são `contents: read`. Smoke tem timeout
+de 30 minutos, guardrails de 20. Admissão por repo/workflow/job/evento/SHA pertence
+ao controlador separado; esta fonte não instala perfil nem autoriza execução.
+
+O smoke continua real: render config, build/up do controller, espera até
+600 segundos por `/login`, smoke-tests, logs em falha e down -v. Executa somente
+no Docker próprio de VM Linux ARM64 recém-criada, nunca no Docker/socket do Mac.
+Antes de qualquer Compose mutante exige marker, fonte exata, ausência de mounts
+compartilhados/SSH agent/gateway local de artifacts/credenciais ou perfis AWS,
+endpoint `unix:///var/run/docker.sock`, contexto default e daemon Linux ARM64.
+Qualquer container preexistente, inclusive parado, ou falha no inventário nega
+execução. Contexto remoto/TLS/config arbitrário também é negado.
+O único DOCKER_CONFIG aceito é `/opt/actions-runner/.docker`, com diretório e
+`config.json` regulares, sem symlink, e SHA256 exato
+`8d3a19ad6503a6a47a058d1395f50e189f7e0bc893bd917b39b081791580765c`.
+É o contrato Root revisado: apenas proxies/default httpProxy, httpsProxy e
+noProxy, HTTP/HTTPS em `http://192.168.5.100:3128`, sem auth/context/credenciais.
+O proxy é preservado: Docker build RUN precisa dele para downloads. Qualquer
+drift do arquivo exige nova revisão; a guarda não esvazia nem recria o config.
+A guarda Linux ARM64/marker, ausência de host mounts e SHA exato continua
+obrigatória antes desta exceção, que não permite outro diretório/endpoint.
+
+A `.env` de CI é cópia da `.env.example` pública. Nenhum secret GitHub/cloud é
+fornecido: senhas são fixtures públicas, AD permanece `example.local` e nenhum
+AD é provisionado. `credentials.example.yaml` não integra a lista CASC ativa;
+placeholders AWS/SSH do exemplo não são exportados para o controller. O login
+verificado pelo smoke não comprova autenticação AD nem jornada administrativa.
+
+Somente CI sobrescreve `JENKINS_JAVA_OPTS` para
+`-Xms256m -Xmx768m -Djenkins.install.runSetupWizard=false`. A fixture original
+pede heap de 2048 MiB, inadequado à VM de 2 GiB. Um override temporário acrescenta
+`mem_limit: 1280m`, `cpus: 1.5`, nome do controller por projeto e portas
+8080/50000 publicadas apenas em `127.0.0.1` do guest. Heap limitado não garante
+build/plugins dentro do orçamento: aceite exige smoke real na VM.
+
+O projeto `jenkins-ci-RUN_ID-RUN_ATTEMPT` é exclusivo; Compose recebe explicitamente
+base + override existente + override temporário por COMPOSE_FILE. Ports usa
+`!override`, exigindo Compose >= 2.24.4 para não manter publishes amplos por merge.
+Logs e down -v só são habilitados após aprovação da guarda do guest Docker e
+preparo do override; falha de guarda nunca aciona cleanup contra daemon incerto.
+O socket montado pelo Compose é apenas o socket do Docker do guest. Os demais
+binds são arquivos do checkout dentro da VM, sem mounts do host/Mac.
+
+Scripts, init Groovy, CASC, Dockerfiles e Compose principais permanecem intactos.
+Prova nativa desta preparação é apenas config puro com endpoint Unix inexistente,
+HOME/Docker config próprios e AWS scrub, além de syntax/contratos com IO mockado.
+Nenhum Docker build/run/up, serviço, AD, VM ou smoke real foi executado no host.
+Revisão independente Main e smoke Linux ARM64 real permanecem pendentes.
+Sem Root/runtime/API write, commit/push, produção, billing ou alterações nos
+candidatos anteriores congelados. Rollback desta fase: não publicar/admitir a fonte.
+
+O smoke test aceita a revisão de pacote Ubuntu na versão do Docker Compose
+(por exemplo, `2.40.3+ds1-0ubuntu1~24.04.1`), mantendo o mínimo 2.24.4.
+
+O controller converte apenas os mirrors oficiais Debian já configurados para
+HTTPS antes do APT, com CA e assinaturas preservadas. O proxy isolado precisa
+permitir os destinos oficiais de pacotes, Trivy e plugins Jenkins por HTTPS;
+a alteração do proxy é validada e ativada após drenagem dos jobs em andamento.
+A instalação de plugins no build usa o archive oficial HTTPS do Jenkins;
+checksums e validações do instalador permanecem ativos.
+
+O smoke isolado passa o proxy HTTP/HTTPS ao instalador Java por propriedades
+JVM, pois o Java não utiliza automaticamente `HTTP_PROXY`/`HTTPS_PROXY`. O
+argumento `JENKINS_PLUGIN_JAVA_OPTS` é opcional e restrito ao build; o override
+CI também configura o Java do controller. Builds e runtime fora do CI mantêm
+seus defaults. Nenhuma verificação TLS, assinatura APT ou checksum é desativada.
