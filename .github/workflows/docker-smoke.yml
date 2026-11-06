@@ -6,15 +6,134 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
+env:
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  TF_INPUT: "false"
+  TF_IN_AUTOMATION: "true"
+  AWS_EC2_METADATA_DISABLED: "true"
+  AWS_SHARED_CREDENTIALS_FILE: /dev/null
+  AWS_CONFIG_FILE: /dev/null
+  DOCKER_HOST: unix:///var/run/docker.sock
+  COMPOSE_PROJECT_NAME: jenkins-ci-${{ github.run_id }}-${{ github.run_attempt }}
+  COMPOSE_PROFILES: ""
+  JENKINS_JAVA_OPTS: -Xms256m -Xmx768m -Djenkins.install.runSetupWizard=false
+
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ["jenkins-run-${{ github.run_id }}"]
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact source and isolated guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -f /opt/isolation-base-ready
+          test ! -L /opt/isolation-base-ready
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = aarch64
+          test -z "${SSH_AUTH_SOCK:-}"
+          test -z "${LOCAL_ARTIFACT_TOKEN:-}"
+          test -z "${LOCAL_ARTIFACT_URL:-}"
+          for credential in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_WEB_IDENTITY_TOKEN_FILE AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_PROFILE AWS_DEFAULT_PROFILE; do
+            test -z "${!credential:-}"
+          done
+          mount_inventory=$(findmnt --raw --noheadings --output FSTYPE)
+          test -n "$mount_inventory"
+          while IFS= read -r filesystem; do
+            case "$filesystem" in
+              9p|virtiofs|nfs|nfs4|cifs|smbfs|fuse.sshfs|""|*[!A-Za-z0-9_.-]*) exit 1 ;;
+            esac
+          done <<< "$mount_inventory"
+
+      - name: Verify fresh guest Docker
+        id: guest_docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$DOCKER_HOST" = unix:///var/run/docker.sock
+          for option in DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH DOCKER_SSH_COMMAND DOCKER_API_VERSION COMPOSE_FILE; do
+            test -z "${!option:-}"
+          done
+          python3 - <<'PYCODE'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          approved = Path('/opt/actions-runner/.docker')
+          if os.environ.get('DOCKER_CONFIG') != str(approved):
+              raise SystemExit('Docker config must be the reviewed runner proxy directory')
+          config = approved / 'config.json'
+          if approved.is_symlink() or not approved.is_dir() or config.is_symlink() or not config.is_file():
+              raise SystemExit('Docker proxy directory/config must be regular, not symlinks')
+          raw = config.read_bytes()
+          if hashlib.sha256(raw).hexdigest() != '8d3a19ad6503a6a47a058d1395f50e189f7e0bc893bd917b39b081791580765c':
+              raise SystemExit('Docker proxy config digest differs from reviewed Root contract')
+          data = json.loads(raw)
+          if set(data) != {'proxies'} or set(data['proxies']) != {'default'}:
+              raise SystemExit('Docker config must contain only reviewed proxies')
+          proxy = data['proxies']['default']
+          if set(proxy) != {'httpProxy', 'httpsProxy', 'noProxy'}:
+              raise SystemExit('Docker config contains unknown proxy options')
+          if proxy['httpProxy'] != 'http://192.168.5.100:3128' or proxy['httpsProxy'] != 'http://192.168.5.100:3128':
+              raise SystemExit('Docker proxy endpoints differ from reviewed Root contract')
+          if not isinstance(proxy['noProxy'], str):
+              raise SystemExit('Docker noProxy must be the reviewed string')
+          PYCODE
+          test -S /var/run/docker.sock
+          test "$(docker context show)" = default
+          test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
+          daemon_platform=$(docker info --format '{{.OSType}}/{{.Architecture}}')
+          case "$daemon_platform" in linux/aarch64|linux/arm64) ;; *) exit 1 ;; esac
+          container_ids=$(docker ps --all --quiet)
+          test -z "$container_ids"
+          compose_version=$(docker compose version --short)
+          python3 - "$compose_version" <<'PYCODE'
+          import re
+          import sys
+          value = sys.argv[1].removeprefix('v')
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', value):
+              raise SystemExit('Unrecognized Docker Compose version')
+          version = tuple(map(int, re.match(r'([0-9]+)\.([0-9]+)\.([0-9]+)', value).groups()))
+          if version < (2, 24, 4):
+              raise SystemExit('Docker Compose >= 2.24.4 is required for !override')
+          PYCODE
 
       - name: Prepare env
         run: cp .env.example .env
+
+      - name: Prepare scoped CI Compose override
+        id: compose_ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$COMPOSE_PROJECT_NAME" =~ ^jenkins-ci-[0-9]+-[0-9]+$ ]]
+          override_directory=$(mktemp -d "$RUNNER_TEMP/jenkins-compose.XXXXXXXX")
+          override_file="$override_directory/compose-ci.yml"
+          cat > "$override_file" <<'YAML'
+          services:
+            jenkins-controller:
+              container_name: ${COMPOSE_PROJECT_NAME}-controller
+              mem_limit: 1280m
+              cpus: 1.5
+              environment:
+                JAVA_OPTS: ${JENKINS_JAVA_OPTS}
+              ports: !override
+                - "127.0.0.1:8080:8080"
+                - "127.0.0.1:50000:50000"
+          YAML
+          printf 'COMPOSE_FILE=%s:%s:%s\n' "$GITHUB_WORKSPACE/docker-compose.yml" "$GITHUB_WORKSPACE/docker-compose.override.yml" "$override_file" >> "$GITHUB_ENV"
 
       - name: Validate shell scripts
         shell: bash
@@ -37,9 +156,9 @@ jobs:
         run: bash ./scripts/smoke-tests.sh
 
       - name: Dump Jenkins logs
-        if: failure()
+        if: failure() && steps.guest_docker.outcome == 'success' && steps.compose_ci.outcome == 'success'
         run: docker compose logs --no-color jenkins-controller
 
       - name: Tear down
-        if: always()
+        if: always() && steps.guest_docker.outcome == 'success' && steps.compose_ci.outcome == 'success'
         run: docker compose down -v
