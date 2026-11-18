@@ -248,10 +248,10 @@ compartilhados/SSH agent/gateway local de artifacts/credenciais ou perfis AWS,
 endpoint `unix:///var/run/docker.sock`, contexto default e daemon Linux ARM64.
 Qualquer container preexistente, inclusive parado, ou falha no inventário nega
 execução. Contexto remoto/TLS/config arbitrário também é negado.
-O único DOCKER_CONFIG aceito é `/opt/actions-runner/.docker`, com diretório e
+O único DOCKER_CONFIG aceito é `/opt/ci-docker-config`, com diretório e
 `config.json` regulares, sem symlink, e SHA256 exato
-`8d3a19ad6503a6a47a058d1395f50e189f7e0bc893bd917b39b081791580765c`.
-É o contrato Root revisado: apenas proxies/default httpProxy, httpsProxy e
+`9dc4382b255bef99b5eb341a7c0a8d139ecf9c3f294711ebc7ebb765baa5c7d6`.
+É o contrato local de VM isolada revisado: apenas proxies/default httpProxy, httpsProxy e
 noProxy, HTTP/HTTPS em `http://192.168.5.100:3128`, sem auth/context/credenciais.
 O proxy é preservado: Docker build RUN precisa dele para downloads. Qualquer
 drift do arquivo exige nova revisão; a guarda não esvazia nem recria o config.
@@ -302,3 +302,61 @@ JVM, pois o Java não utiliza automaticamente `HTTP_PROXY`/`HTTPS_PROXY`. O
 argumento `JENKINS_PLUGIN_JAVA_OPTS` é opcional e restrito ao build; o override
 CI também configura o Java do controller. Builds e runtime fora do CI mantêm
 seus defaults. Nenhuma verificação TLS, assinatura APT ou checksum é desativada.
+
+### Imagens dos exemplos e supply chain
+
+As bases Docker são fixadas pelo digest do índice multiarch do registry oficial.
+Atualizações de base exigem nova resolução, build e revisão da PR; os antigos
+build-args de tag Jenkins não substituem mais a base revisada. Exemplos Java,
+Node e Python executam como UID/GID 10001, sem privilégios. Diretórios da
+aplicação permanecem somente leitura para esse usuário; temporários usam /tmp.
+Nenhuma imagem é publicada ou promovida automaticamente por esta correção.
+Reversão: reverter a PR após revisão, sem remover volumes ou dados.
+
+### Runner Docker local isolado
+
+O controlador provisiona proxy efêmero dentro da própria VM, no endpoint
+192.168.5.100:3128, sem depender de outro host Root. O config é estático,
+somente leitura e validado pelo SHA acima; noProxy aceita exclusivamente
+localhost,127.0.0.1,::1. O proxy só aceita CONNECT HTTPS na porta 443 para
+domínios de distribuição configurados (incluindo CDNs de múltiplos tenants)
+e nega destinos privados/link-local. A ACL não comprova autoria/integridade
+de conteúdo; checksums, assinaturas APT e o instalador Jenkins mantêm essa
+validação separada. O job usa Docker rootless, obrigatório na guarda do
+workflow. Root no container mapeia para ci-job/subuids, não root do guest;
+não há grupo docker, sudo nem capacidade de alterar nft/Squid no namespace
+pai. A política de egress é root-owned no guest e sobrevive ao privilégio
+dos containers rootless. Nunca usa Docker/mounts/agent/cloud do Mac.
+A VM deve ser descartada somente após conclusão e confirmação do job.
+
+O cache/estado Buildx usa `/var/lib/ci-job/.docker-buildx`, separado do
+Docker config estático somente leitura; não é necessário liberar escrita
+em `/opt/ci-docker-config` para construir imagens.
+
+Na CI, o build dos plugins usa o mirror HTTPS
+`ftp-nyc.osuosl.org/pub/jenkins`, indicado pelo serviço oficial `get.jenkins.io`,
+com hostname exato na ACL e verificações de checksum do instalador mantidas.
+O argumento `JENKINS_PLUGIN_DOWNLOAD_URL` permite essa seleção somente no
+override de CI; o build padrão continua usando `archives.jenkins.io`.
+O timeout do workflow permanece em 30 minutos. A recuperação limitada do
+serviço Squid e seus diagnósticos pertencem ao provisionamento da VM;
+não permitem acesso privado nem substituem os gates de build e smoke.
+
+### Regressão de build dos exemplos
+
+O Docker Smoke também constrói e executa os quatro exemplos CLI (Java, Go,
+Node e Python) no daemon rootless, sem publicar portas/imagens. Java executa
+seus testes Maven antes do empacotamento; Node mantém o teste original,
+JUnit e LCOV usando node:test nativo, com npm audit completo exigindo zero
+achados. O lockfile é versionado, sem Jest/jest-junit/picomatch transitivos.
+Go compila para TARGETOS/TARGETARCH do BuildKit e o smoke confere o campo
+ELF, impedindo binário amd64 dentro de imagem ARM64 mesmo quando houver
+emulação disponível. A execução readonly usa apenas /tmp efêmero.
+
+O exemplo Java declara explicitamente Main-Class no manifest do JAR via
+maven-jar-plugin fixado, para que `java -jar /app/app.jar` execute o mesmo
+programa validado pelos testes Maven.
+
+O Docker config protegido fica sob `/opt`, cujo diretório pai também pertence
+a root; não fica sob o diretório gravável do runner. Assim ci-job não pode
+renomear o diretório protegido para substituí-lo por outro config.

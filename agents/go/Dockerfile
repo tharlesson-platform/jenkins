@@ -1,5 +1,4 @@
-﻿ARG INBOUND_AGENT_TAG=latest-jdk21
-FROM jenkins/inbound-agent:${INBOUND_AGENT_TAG}
+FROM jenkins/inbound-agent:latest-jdk21@sha256:25a3704f7de4d3d0becc441f5683a227556658df1473865ee94c5232355678ab
 
 USER root
 

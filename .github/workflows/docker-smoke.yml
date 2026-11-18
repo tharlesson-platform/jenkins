@@ -17,6 +17,7 @@ env:
   AWS_SHARED_CREDENTIALS_FILE: /dev/null
   AWS_CONFIG_FILE: /dev/null
   DOCKER_HOST: unix:///var/run/docker.sock
+  BUILDX_CONFIG: /var/lib/ci-job/.docker-buildx
   COMPOSE_PROJECT_NAME: jenkins-ci-${{ github.run_id }}-${{ github.run_attempt }}
   COMPOSE_PROFILES: ""
   JENKINS_JAVA_OPTS: -Xms256m -Xmx768m -Djenkins.install.runSetupWizard=false
@@ -72,15 +73,15 @@ jobs:
           import os
           from pathlib import Path
 
-          approved = Path('/opt/actions-runner/.docker')
+          approved = Path('/opt/ci-docker-config')
           if os.environ.get('DOCKER_CONFIG') != str(approved):
               raise SystemExit('Docker config must be the reviewed runner proxy directory')
           config = approved / 'config.json'
           if approved.is_symlink() or not approved.is_dir() or config.is_symlink() or not config.is_file():
               raise SystemExit('Docker proxy directory/config must be regular, not symlinks')
           raw = config.read_bytes()
-          if hashlib.sha256(raw).hexdigest() != '8d3a19ad6503a6a47a058d1395f50e189f7e0bc893bd917b39b081791580765c':
-              raise SystemExit('Docker proxy config digest differs from reviewed Root contract')
+          if hashlib.sha256(raw).hexdigest() != '9dc4382b255bef99b5eb341a7c0a8d139ecf9c3f294711ebc7ebb765baa5c7d6':
+              raise SystemExit('Docker proxy config digest differs from reviewed isolated VM contract')
           data = json.loads(raw)
           if set(data) != {'proxies'} or set(data['proxies']) != {'default'}:
               raise SystemExit('Docker config must contain only reviewed proxies')
@@ -88,13 +89,14 @@ jobs:
           if set(proxy) != {'httpProxy', 'httpsProxy', 'noProxy'}:
               raise SystemExit('Docker config contains unknown proxy options')
           if proxy['httpProxy'] != 'http://192.168.5.100:3128' or proxy['httpsProxy'] != 'http://192.168.5.100:3128':
-              raise SystemExit('Docker proxy endpoints differ from reviewed Root contract')
-          if not isinstance(proxy['noProxy'], str):
+              raise SystemExit('Docker proxy endpoints differ from reviewed isolated VM contract')
+          if proxy['noProxy'] != 'localhost,127.0.0.1,::1':
               raise SystemExit('Docker noProxy must be the reviewed string')
           PYCODE
           test -S /var/run/docker.sock
           test "$(docker context show)" = default
           test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
+          docker info --format '{{range .SecurityOptions}}{{println .}}{{end}}' | grep -Fx name=rootless
           daemon_platform=$(docker info --format '{{.OSType}}/{{.Architecture}}')
           case "$daemon_platform" in linux/aarch64|linux/arm64) ;; *) exit 1 ;; esac
           container_ids=$(docker ps --all --quiet)
@@ -128,6 +130,7 @@ jobs:
               build:
                 args:
                   JENKINS_PLUGIN_JAVA_OPTS: ${JENKINS_CI_JAVA_PROXY_OPTS}
+                  JENKINS_PLUGIN_DOWNLOAD_URL: https://ftp-nyc.osuosl.org/pub/jenkins
               container_name: ${COMPOSE_PROJECT_NAME}-controller
               mem_limit: 1280m
               cpus: 1.5
@@ -149,6 +152,9 @@ jobs:
 
       - name: Render compose config
         run: docker compose config >/dev/null
+
+      - name: Build and run CLI examples with native Node tests
+        run: bash ./scripts/smoke-example-images.sh
 
       - name: Start Jenkins controller
         run: docker compose up -d --build jenkins-controller

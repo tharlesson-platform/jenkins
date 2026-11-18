@@ -1,5 +1,7 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
 const { sum } = require('../src/sum');
 
 test('sum should work', () => {
-  expect(sum(2, 3)).toBe(5);
+  assert.equal(sum(2, 3), 5);
 });

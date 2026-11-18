@@ -4,17 +4,12 @@
   "description": "Minimal Node sample for Jenkins CI validation",
   "main": "src/index.js",
   "scripts": {
-    "lint": "node --check src/index.js src/sum.js",
-    "test": "jest --ci --coverage --reporters=default --reporters=jest-junit",
-    "coverage": "jest --coverage",
+    "lint": "node --check src/index.js && node --check src/sum.js",
+    "test": "mkdir -p test-results coverage && node --test --experimental-test-coverage --test-reporter=spec --test-reporter=junit --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=test-results/junit.xml --test-reporter-destination=coverage/lcov.info test/*.test.js",
+    "coverage": "npm test",
     "build": "mkdir -p dist && cp -r src/* dist/"
   },
-  "jest-junit": {
-    "outputDirectory": "test-results",
-    "outputName": "junit.xml"
-  },
-  "devDependencies": {
-    "jest": "^30.3.0",
-    "jest-junit": "^16.0.0"
+  "engines": {
+    "node": ">=22"
   }
 }

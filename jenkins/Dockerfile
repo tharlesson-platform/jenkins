@@ -1,5 +1,4 @@
-﻿ARG JENKINS_VERSION=lts-jdk21
-FROM jenkins/jenkins:${JENKINS_VERSION}
+FROM jenkins/jenkins:lts-jdk21@sha256:74401de6a6f92e1afe1b02d1c8e3d0c33f263bfb5275dd8813f9150355f2367b
 
 USER root
 
@@ -35,10 +34,12 @@ RUN curl -fsSL https://aquasecurity.github.io/trivy-repo/deb/public.key \
 USER jenkins
 
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
-# Use the official stable archive for this build; retain plugin integrity checks.
+# O build padrão usa o arquivo oficial; a CI pode escolher um mirror oficial.
+# As verificações de integridade dos plugins permanecem ativas.
 ARG JENKINS_PLUGIN_JAVA_OPTS=""
+ARG JENKINS_PLUGIN_DOWNLOAD_URL=https://archives.jenkins.io
 RUN JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}${JENKINS_PLUGIN_JAVA_OPTS:+ ${JENKINS_PLUGIN_JAVA_OPTS}}" \
-    JENKINS_UC_DOWNLOAD=https://archives.jenkins.io \
+    JENKINS_UC_DOWNLOAD="${JENKINS_PLUGIN_DOWNLOAD_URL}" \
     jenkins-plugin-cli --verbose --plugin-file /usr/share/jenkins/ref/plugins.txt
 
 # Bootstrap as code
