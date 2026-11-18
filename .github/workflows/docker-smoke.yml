@@ -95,6 +95,7 @@ jobs:
           test -S /var/run/docker.sock
           test "$(docker context show)" = default
           test "$(docker context inspect default --format '{{.Endpoints.docker.Host}}')" = unix:///var/run/docker.sock
+          docker info --format '{{range .SecurityOptions}}{{println .}}{{end}}' | grep -Fx name=rootless
           daemon_platform=$(docker info --format '{{.OSType}}/{{.Architecture}}')
           case "$daemon_platform" in linux/aarch64|linux/arm64) ;; *) exit 1 ;; esac
           container_ids=$(docker ps --all --quiet)

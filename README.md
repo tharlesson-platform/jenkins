@@ -319,8 +319,12 @@ O controlador provisiona proxy efêmero dentro da própria VM, no endpoint
 192.168.5.100:3128, sem depender de outro host Root. O config é estático,
 somente leitura e validado pelo SHA acima; noProxy aceita exclusivamente
 localhost,127.0.0.1,::1. O proxy só aceita CONNECT HTTPS na porta 443 para
-domínios oficiais de downloads e nega destinos privados/link-local.
-Containers têm bloqueio adicional de destinos privados no DOCKER-USER.
-O job tem acesso ao Docker dessa VM descartável; isso equivale a root no
-guest, nunca ao Docker do Mac. Não há mounts/agent/credenciais cloud do host.
+domínios de distribuição configurados (incluindo CDNs de múltiplos tenants)
+e nega destinos privados/link-local. A ACL não comprova autoria/integridade
+de conteúdo; checksums, assinaturas APT e o instalador Jenkins mantêm essa
+validação separada. O job usa Docker rootless, obrigatório na guarda do
+workflow. Root no container mapeia para ci-job/subuids, não root do guest;
+não há grupo docker, sudo nem capacidade de alterar nft/Squid no namespace
+pai. A política de egress é root-owned no guest e sobrevive ao privilégio
+dos containers rootless. Nunca usa Docker/mounts/agent/cloud do Mac.
 A VM deve ser descartada somente após conclusão e confirmação do job.
