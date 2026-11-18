@@ -29,10 +29,17 @@ for example in python-app node-app java-maven-app go-app; do
  test "$runtime_uid" = 10001
  output=$(docker run --rm --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m \
    --cap-drop ALL --security-opt no-new-privileges "$tag")
- case "$example:$output" in
-  python-app:*'python-app ready'*|node-app:*'node-app ready: 2 + 3 = 5'*|java-maven-app:*'java-maven-app ready'*|go-app:*'go-app ready'*) ;;
-  *) echo "Saída inesperada no exemplo $example" >&2; exit 1 ;;
+ case "$example" in
+  python-app) expected='python-app ready' ;;
+  node-app) expected='node-app ready: 2 + 3 = 5' ;;
+  java-maven-app) expected='java-maven-app ready' ;;
+  go-app) expected='go-app ready' ;;
+  *) echo "Exemplo desconhecido: $example" >&2; exit 1 ;;
  esac
+ if [[ "$output" != *"$expected"* ]]; then
+  echo "Saída inesperada no exemplo $example" >&2
+  exit 1
+ fi
  echo "Exemplo $example executado sem root com sucesso."
 done
 # Não aceitar binário amd64 dentro de uma imagem declarada ARM64 (nem via emulação).
