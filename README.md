@@ -248,7 +248,7 @@ compartilhados/SSH agent/gateway local de artifacts/credenciais ou perfis AWS,
 endpoint `unix:///var/run/docker.sock`, contexto default e daemon Linux ARM64.
 Qualquer container preexistente, inclusive parado, ou falha no inventário nega
 execução. Contexto remoto/TLS/config arbitrário também é negado.
-O único DOCKER_CONFIG aceito é `/opt/actions-runner/.docker`, com diretório e
+O único DOCKER_CONFIG aceito é `/opt/ci-docker-config`, com diretório e
 `config.json` regulares, sem symlink, e SHA256 exato
 `9dc4382b255bef99b5eb341a7c0a8d139ecf9c3f294711ebc7ebb765baa5c7d6`.
 É o contrato local de VM isolada revisado: apenas proxies/default httpProxy, httpsProxy e
@@ -331,7 +331,7 @@ A VM deve ser descartada somente após conclusão e confirmação do job.
 
 O cache/estado Buildx usa `/var/lib/ci-job/.docker-buildx`, separado do
 Docker config estático somente leitura; não é necessário liberar escrita
-em `/opt/actions-runner/.docker` para construir imagens.
+em `/opt/ci-docker-config` para construir imagens.
 
 ### Regressão de build dos exemplos
 
@@ -347,3 +347,7 @@ emulação disponível. A execução readonly usa apenas /tmp efêmero.
 O exemplo Java declara explicitamente Main-Class no manifest do JAR via
 maven-jar-plugin fixado, para que `java -jar /app/app.jar` execute o mesmo
 programa validado pelos testes Maven.
+
+O Docker config protegido fica sob `/opt`, cujo diretório pai também pertence
+a root; não fica sob o diretório gravável do runner. Assim ci-job não pode
+renomear o diretório protegido para substituí-lo por outro config.

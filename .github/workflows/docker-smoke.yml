@@ -73,7 +73,7 @@ jobs:
           import os
           from pathlib import Path
 
-          approved = Path('/opt/actions-runner/.docker')
+          approved = Path('/opt/ci-docker-config')
           if os.environ.get('DOCKER_CONFIG') != str(approved):
               raise SystemExit('Docker config must be the reviewed runner proxy directory')
           config = approved / 'config.json'
