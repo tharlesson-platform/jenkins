@@ -302,3 +302,13 @@ JVM, pois o Java não utiliza automaticamente `HTTP_PROXY`/`HTTPS_PROXY`. O
 argumento `JENKINS_PLUGIN_JAVA_OPTS` é opcional e restrito ao build; o override
 CI também configura o Java do controller. Builds e runtime fora do CI mantêm
 seus defaults. Nenhuma verificação TLS, assinatura APT ou checksum é desativada.
+
+### Imagens dos exemplos e supply chain
+
+As bases Docker são fixadas pelo digest do índice multiarch do registry oficial.
+Atualizações de base exigem nova resolução, build e revisão da PR; os antigos
+build-args de tag Jenkins não substituem mais a base revisada. Exemplos Java,
+Node e Python executam como UID/GID 10001, sem privilégios. Diretórios da
+aplicação permanecem somente leitura para esse usuário; temporários usam /tmp.
+Nenhuma imagem é publicada ou promovida automaticamente por esta correção.
+Reversão: reverter a PR após revisão, sem remover volumes ou dados.
