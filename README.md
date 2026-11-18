@@ -343,3 +343,7 @@ achados. O lockfile é versionado, sem Jest/jest-junit/picomatch transitivos.
 Go compila para TARGETOS/TARGETARCH do BuildKit e o smoke confere o campo
 ELF, impedindo binário amd64 dentro de imagem ARM64 mesmo quando houver
 emulação disponível. A execução readonly usa apenas /tmp efêmero.
+
+O exemplo Java declara explicitamente Main-Class no manifest do JAR via
+maven-jar-plugin fixado, para que `java -jar /app/app.jar` execute o mesmo
+programa validado pelos testes Maven.
