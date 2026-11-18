@@ -152,6 +152,9 @@ jobs:
       - name: Render compose config
         run: docker compose config >/dev/null
 
+      - name: Build and run CLI examples with native Node tests
+        run: bash ./scripts/smoke-example-images.sh
+
       - name: Start Jenkins controller
         run: docker compose up -d --build jenkins-controller
 

@@ -332,3 +332,14 @@ A VM deve ser descartada somente após conclusão e confirmação do job.
 O cache/estado Buildx usa `/var/lib/ci-job/.docker-buildx`, separado do
 Docker config estático somente leitura; não é necessário liberar escrita
 em `/opt/actions-runner/.docker` para construir imagens.
+
+### Regressão de build dos exemplos
+
+O Docker Smoke também constrói e executa os quatro exemplos CLI (Java, Go,
+Node e Python) no daemon rootless, sem publicar portas/imagens. Java executa
+seus testes Maven antes do empacotamento; Node mantém o teste original,
+JUnit e LCOV usando node:test nativo, com npm audit completo exigindo zero
+achados. O lockfile é versionado, sem Jest/jest-junit/picomatch transitivos.
+Go compila para TARGETOS/TARGETARCH do BuildKit e o smoke confere o campo
+ELF, impedindo binário amd64 dentro de imagem ARM64 mesmo quando houver
+emulação disponível. A execução readonly usa apenas /tmp efêmero.
