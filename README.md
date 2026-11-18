@@ -250,8 +250,8 @@ Qualquer container preexistente, inclusive parado, ou falha no inventário nega
 execução. Contexto remoto/TLS/config arbitrário também é negado.
 O único DOCKER_CONFIG aceito é `/opt/actions-runner/.docker`, com diretório e
 `config.json` regulares, sem symlink, e SHA256 exato
-`8d3a19ad6503a6a47a058d1395f50e189f7e0bc893bd917b39b081791580765c`.
-É o contrato Root revisado: apenas proxies/default httpProxy, httpsProxy e
+`9dc4382b255bef99b5eb341a7c0a8d139ecf9c3f294711ebc7ebb765baa5c7d6`.
+É o contrato local de VM isolada revisado: apenas proxies/default httpProxy, httpsProxy e
 noProxy, HTTP/HTTPS em `http://192.168.5.100:3128`, sem auth/context/credenciais.
 O proxy é preservado: Docker build RUN precisa dele para downloads. Qualquer
 drift do arquivo exige nova revisão; a guarda não esvazia nem recria o config.
@@ -312,3 +312,15 @@ Node e Python executam como UID/GID 10001, sem privilégios. Diretórios da
 aplicação permanecem somente leitura para esse usuário; temporários usam /tmp.
 Nenhuma imagem é publicada ou promovida automaticamente por esta correção.
 Reversão: reverter a PR após revisão, sem remover volumes ou dados.
+
+### Runner Docker local isolado
+
+O controlador provisiona proxy efêmero dentro da própria VM, no endpoint
+192.168.5.100:3128, sem depender de outro host Root. O config é estático,
+somente leitura e validado pelo SHA acima; noProxy aceita exclusivamente
+localhost,127.0.0.1,::1. O proxy só aceita CONNECT HTTPS na porta 443 para
+domínios oficiais de downloads e nega destinos privados/link-local.
+Containers têm bloqueio adicional de destinos privados no DOCKER-USER.
+O job tem acesso ao Docker dessa VM descartável; isso equivale a root no
+guest, nunca ao Docker do Mac. Não há mounts/agent/credenciais cloud do host.
+A VM deve ser descartada somente após conclusão e confirmação do job.

@@ -79,8 +79,8 @@ jobs:
           if approved.is_symlink() or not approved.is_dir() or config.is_symlink() or not config.is_file():
               raise SystemExit('Docker proxy directory/config must be regular, not symlinks')
           raw = config.read_bytes()
-          if hashlib.sha256(raw).hexdigest() != '8d3a19ad6503a6a47a058d1395f50e189f7e0bc893bd917b39b081791580765c':
-              raise SystemExit('Docker proxy config digest differs from reviewed Root contract')
+          if hashlib.sha256(raw).hexdigest() != '9dc4382b255bef99b5eb341a7c0a8d139ecf9c3f294711ebc7ebb765baa5c7d6':
+              raise SystemExit('Docker proxy config digest differs from reviewed isolated VM contract')
           data = json.loads(raw)
           if set(data) != {'proxies'} or set(data['proxies']) != {'default'}:
               raise SystemExit('Docker config must contain only reviewed proxies')
@@ -88,8 +88,8 @@ jobs:
           if set(proxy) != {'httpProxy', 'httpsProxy', 'noProxy'}:
               raise SystemExit('Docker config contains unknown proxy options')
           if proxy['httpProxy'] != 'http://192.168.5.100:3128' or proxy['httpsProxy'] != 'http://192.168.5.100:3128':
-              raise SystemExit('Docker proxy endpoints differ from reviewed Root contract')
-          if not isinstance(proxy['noProxy'], str):
+              raise SystemExit('Docker proxy endpoints differ from reviewed isolated VM contract')
+          if proxy['noProxy'] != 'localhost,127.0.0.1,::1':
               raise SystemExit('Docker noProxy must be the reviewed string')
           PYCODE
           test -S /var/run/docker.sock
