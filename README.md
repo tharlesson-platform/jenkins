@@ -328,3 +328,7 @@ não há grupo docker, sudo nem capacidade de alterar nft/Squid no namespace
 pai. A política de egress é root-owned no guest e sobrevive ao privilégio
 dos containers rootless. Nunca usa Docker/mounts/agent/cloud do Mac.
 A VM deve ser descartada somente após conclusão e confirmação do job.
+
+O cache/estado Buildx usa `/var/lib/ci-job/.docker-buildx`, separado do
+Docker config estático somente leitura; não é necessário liberar escrita
+em `/opt/actions-runner/.docker` para construir imagens.

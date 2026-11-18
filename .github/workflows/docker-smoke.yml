@@ -17,6 +17,7 @@ env:
   AWS_SHARED_CREDENTIALS_FILE: /dev/null
   AWS_CONFIG_FILE: /dev/null
   DOCKER_HOST: unix:///var/run/docker.sock
+  BUILDX_CONFIG: /var/lib/ci-job/.docker-buildx
   COMPOSE_PROJECT_NAME: jenkins-ci-${{ github.run_id }}-${{ github.run_attempt }}
   COMPOSE_PROFILES: ""
   JENKINS_JAVA_OPTS: -Xms256m -Xmx768m -Djenkins.install.runSetupWizard=false
