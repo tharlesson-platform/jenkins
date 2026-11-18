@@ -130,6 +130,7 @@ jobs:
               build:
                 args:
                   JENKINS_PLUGIN_JAVA_OPTS: ${JENKINS_CI_JAVA_PROXY_OPTS}
+                  JENKINS_PLUGIN_DOWNLOAD_URL: https://ftp-nyc.osuosl.org/pub/jenkins
               container_name: ${COMPOSE_PROJECT_NAME}-controller
               mem_limit: 1280m
               cpus: 1.5

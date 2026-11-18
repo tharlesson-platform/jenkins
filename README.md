@@ -333,6 +333,15 @@ O cache/estado Buildx usa `/var/lib/ci-job/.docker-buildx`, separado do
 Docker config estático somente leitura; não é necessário liberar escrita
 em `/opt/ci-docker-config` para construir imagens.
 
+Na CI, o build dos plugins usa o mirror HTTPS
+`ftp-nyc.osuosl.org/pub/jenkins`, indicado pelo serviço oficial `get.jenkins.io`,
+com hostname exato na ACL e verificações de checksum do instalador mantidas.
+O argumento `JENKINS_PLUGIN_DOWNLOAD_URL` permite essa seleção somente no
+override de CI; o build padrão continua usando `archives.jenkins.io`.
+O timeout do workflow permanece em 30 minutos. A recuperação limitada do
+serviço Squid e seus diagnósticos pertencem ao provisionamento da VM;
+não permitem acesso privado nem substituem os gates de build e smoke.
+
 ### Regressão de build dos exemplos
 
 O Docker Smoke também constrói e executa os quatro exemplos CLI (Java, Go,
